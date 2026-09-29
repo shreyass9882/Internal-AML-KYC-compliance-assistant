@@ -1,0 +1,22 @@
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# Built artefacts: rebuild with `amlrag build`
+.index/
+logs/*.db
+results/*
+!results/.gitkeep
+
+# Raw downloads are large; the lock file (kb/snapshot.lock.json) records exactly
+# what was fetched (URL, timestamp, sha256) so the snapshot is reproducible.
+# Remove this line if your tutor wants the raw snapshot committed.
+kb/raw/*
+!kb/raw/.gitkeep
+kb/manual/*.pdf
+kb/manual/*.html
+
+.DS_Store

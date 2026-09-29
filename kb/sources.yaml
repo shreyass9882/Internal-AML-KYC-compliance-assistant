@@ -1,0 +1,147 @@
+# Knowledge-base source manifest.
+#
+# VERSION LOCK: `amlrag fetch` downloads every source below once and records
+# URL, final URL, timestamp and sha256 in kb/snapshot.lock.json. Later runs
+# reuse the snapshot and never silently pick up new text. Run
+# `amlrag fetch --refresh` to re-download and get a report of which documents
+# changed since the locked snapshot (the AML/CTF reform rolled out
+# 31 Mar - 1 Jul 2026 and AUSTRAC is still revising guidance).
+#
+# MANUAL OVERRIDE: if kb/manual/<id>.pdf (or .html) exists, it is used instead
+# of the URL. Use this for legislation, whose "latest compilation" download
+# links change with each compilation.
+#
+# Scope decision: customer due diligence only (the tier determination use
+# case). The "(Reform)" transitional copies under /about-us/amlctf-reform/ are
+# excluded because they duplicate the in-force pages below and would create
+# near-duplicate chunks with conflicting dates.
+
+defaults:
+  user_agent: "RMIT-WIL-Group94-AML-RAG/0.1 (student research project; polite crawler)"
+  delay_s: 1.5
+  timeout_s: 45
+
+documents:
+  # ---------------------------------------------------------------- legislation
+  - id: rules2025
+    title: Anti-Money Laundering and Counter-Terrorism Financing Rules 2025
+    short: AML/CTF Rules 2025
+    kind: legislation
+    # As-made version (29 Aug 2025). The 2026 amendment rules (F2026L00353)
+    # changed parts of the text: for the final snapshot download the *latest
+    # compilation* PDF from https://www.legislation.gov.au/F2025L01026/latest
+    # and save it as kb/manual/rules2025.pdf.
+    url: https://www.legislation.gov.au/F2025L01026/asmade/2025-08-29/text/original/pdf
+    section_label: "s"
+    # Rules sections are numbered "<part>-<section>", e.g. "6-23".
+    section_pattern: '^(\d{1,2}-\d{1,3}[A-Z]?)\s+([A-Z][^\n]{2,160})$'
+    include_parts: ["1", "6"]      # Part 1 = definitions/preliminary, Part 6 = CDD
+
+  - id: amlctf-act
+    title: Anti-Money Laundering and Counter-Terrorism Financing Act 2006
+    short: AML/CTF Act
+    kind: legislation
+    optional: true
+    # Download the latest compilation PDF (C2004A01550) from
+    # https://www.legislation.gov.au/C2004A01550/latest and save it as
+    # kb/manual/amlctf-act.pdf. Sections 28-32 (initial, delayed, ongoing,
+    # simplified, enhanced CDD) are the ones the tier logic rests on.
+    url: null
+    section_label: "s"
+    section_pattern: '^(\d{1,3}[A-Z]{0,2})\s{1,4}([A-Z][a-z][^\n]{2,150})$'
+    include_parts: ["1", "2"]      # Part 1 includes s 5 definitions (PEP etc.), Part 2 = CDD
+
+  # ------------------------------------------------------ AUSTRAC guidance (HTML)
+  - id: austrac-cdd-overview
+    title: Overview of customer due diligence
+    kind: guidance
+    url: https://www.austrac.gov.au/industry-and-business/obligations-and-guidance/your-amlctf-program/customer-due-diligence/overview-customer-due-diligence
+
+  - id: austrac-initial-cdd
+    title: Overview of initial customer due diligence
+    kind: guidance
+    url: https://www.austrac.gov.au/industry-and-business/obligations-and-guidance/your-amlctf-program/customer-due-diligence/initial-customer-due-diligence/overview-initial-customer-due-diligence
+
+  - id: austrac-cdd-individuals
+    title: Initial CDD for individuals
+    kind: guidance
+    url: https://www.austrac.gov.au/industry-and-business/obligations-and-guidance/your-amlctf-program/customer-due-diligence/initial-customer-due-diligence/initial-customer-due-diligence-guides-customer-type/initial-cdd-individuals
+
+  - id: austrac-cdd-sole-traders
+    title: Initial CDD for sole traders
+    kind: guidance
+    url: https://www.austrac.gov.au/industry-and-business/obligations-and-guidance/your-amlctf-program/customer-due-diligence/initial-customer-due-diligence/initial-customer-due-diligence-guides-customer-type/initial-cdd-sole-traders
+
+  - id: austrac-cdd-body-corporate
+    title: Initial CDD for body corporate, partnership or unincorporated association
+    kind: guidance
+    url: https://www.austrac.gov.au/industry-and-business/obligations-and-guidance/your-amlctf-program/customer-due-diligence/initial-customer-due-diligence/initial-customer-due-diligence-guides-customer-type/initial-cdd-body-corporate-partnership-or-unincorporated-association
+
+  - id: austrac-cdd-trust
+    title: Initial CDD for trust
+    kind: guidance
+    url: https://www.austrac.gov.au/industry-and-business/obligations-and-guidance/your-amlctf-program/customer-due-diligence/initial-customer-due-diligence/initial-customer-due-diligence-guides-customer-type/initial-cdd-trust
+
+  - id: austrac-cdd-government-body
+    title: Initial CDD for a government body
+    kind: guidance
+    url: https://www.austrac.gov.au/industry-and-business/obligations-and-guidance/your-amlctf-program/customer-due-diligence/initial-customer-due-diligence/initial-customer-due-diligence-guides-customer-type/initial-cdd-government-body
+
+  - id: austrac-delayed-cdd
+    title: Delayed initial customer due diligence
+    kind: guidance
+    url: https://www.austrac.gov.au/industry-and-business/obligations-and-guidance/your-amlctf-program/customer-due-diligence/initial-customer-due-diligence/delayed-initial-customer-due-diligence
+
+  - id: austrac-ecdd
+    title: Enhanced customer due diligence
+    kind: guidance
+    url: https://www.austrac.gov.au/industry-and-business/obligations-and-guidance/your-amlctf-program/customer-due-diligence/enhanced-customer-due-diligence
+
+  - id: austrac-pep
+    title: Politically exposed persons (PEP)
+    kind: guidance
+    url: https://www.austrac.gov.au/industry-and-business/obligations-and-guidance/your-amlctf-program/customer-due-diligence/politically-exposed-persons-pep
+
+  - id: austrac-foreign-pep-example
+    title: Foreign PEP example
+    kind: guidance
+    url: https://www.austrac.gov.au/industry-and-business/obligations-and-guidance/your-amlctf-program/customer-due-diligence/politically-exposed-persons/foreign-pep-example
+
+  - id: austrac-ongoing-cdd
+    title: Overview of ongoing customer due diligence
+    kind: guidance
+    url: https://www.austrac.gov.au/industry-and-business/obligations-and-guidance/your-amlctf-program/customer-due-diligence/ongoing-customer-due-diligence/overview-ongoing-customer-due-diligence
+
+  - id: austrac-risk-ratings
+    title: Assigning customer risk ratings
+    kind: guidance
+    url: https://www.austrac.gov.au/industry-and-business/obligations-and-guidance/your-amlctf-program/customer-due-diligence/assigning-customer-risk-ratings
+
+  - id: austrac-transitioning
+    title: Transitioning existing customers
+    kind: guidance
+    url: https://www.austrac.gov.au/industry-and-business/obligations-and-guidance/your-amlctf-program/customer-due-diligence/transitioning-existing-customers
+
+  - id: austrac-reliance
+    title: Reliance under customer due diligence arrangements
+    kind: guidance
+    url: https://www.austrac.gov.au/industry-and-business/obligations-and-guidance/your-amlctf-program/customer-due-diligence/reliance-customer-identification-third-party/reliance-under-customer-due-diligence-arrangements
+
+  - id: austrac-high-risk-countries
+    title: High-risk countries, regions and groups
+    kind: guidance
+    url: https://www.austrac.gov.au/industry-and-business/obligations-and-guidance/additional-guidance/high-risk-countries-regions-and-groups
+
+# Discover in-scope pages not listed above (e.g. simplified CDD, customer-type
+# sub-pages added after this manifest was written). Discovered pages get ids
+# "austrac-<last-url-segment>" and are written to the lock file, so they are
+# version-locked like everything else. Review the lock file after first fetch.
+crawl:
+  enabled: true
+  seeds:
+    - https://www.austrac.gov.au/industry-and-business/obligations-and-guidance/your-amlctf-program/customer-due-diligence
+  allow_prefixes:
+    - https://www.austrac.gov.au/industry-and-business/obligations-and-guidance/your-amlctf-program/customer-due-diligence
+  deny_substrings: ["/about-us/amlctf-reform/", "?", "#", ".pdf"]
+  max_depth: 3
+  max_pages: 60

@@ -1,0 +1,184 @@
+# AML/CTF CDD Compliance Assistant
+
+**WIL Project, Group 94 (RMIT).** A Test-Driven RAG assistant that helps AML/CTF compliance officers determine the correct customer due diligence (CDD) tier for a customer scenario, with every determination cited to the specific AUSTRAC guidance section or AML/CTF Rules 2025 clause it relies on.
+
+Everything runs locally: **Ollama** (`llama3.1:8b` for generation, `nomic-embed-text` for embeddings) and **Chroma** as the vector store. No customer data leaves the machine.
+
+> Decision support only. Determinations must be confirmed by a compliance officer against the reporting entity's AML/CTF program.
+
+---
+
+## What it does
+
+| User story | Feature |
+|---|---|
+| Compliance officer: *which CDD tier applies to this scenario?* | **Determine tier** mode returns `simplified`, `standard`, `enhanced` or `insufficient_information`, with reasoning and required measures. Guardrails stop the model from under-applying CDD when the scenario contains a mandatory enhanced CDD trigger. |
+| New team member: *plain-language explanations* | **Explain an obligation** mode: short, plain-English key points, each cited. |
+| Compliance officer: *every answer cited so it can be defended in an audit* | Every point carries citations like `AML/CTF Rules 2025, s 6-23` or `AUSTRAC guidance: Enhanced customer due diligence › When you must apply ECDD`, linked to the source. Citations are verified after generation: invented citations are stripped, unsupported points are flagged, and an answer with no valid citation is withheld. |
+| Compliance manager: *which questions can't it answer confidently?* | Every query is logged. The **Review gaps** tab lists abstentions, low-confidence answers, guardrail escalations and answers marked *not helpful*. |
+
+## Architecture
+
+```mermaid
+flowchart LR
+  subgraph Ingest ["amlrag fetch / build"]
+    A[kb/sources.yaml] --> B[Fetch + version lock<br/>kb/snapshot.lock.json]
+    B --> C[Parse<br/>AUSTRAC HTML by heading<br/>Rules PDF by section 6-xx]
+    C --> D[Chunk within sections<br/>+ contextual header]
+    D --> E[(Chroma<br/>nomic-embed-text)]
+    D --> F[(BM25)]
+  end
+  subgraph Answer ["amlrag ask / serve"]
+    Q[Scenario] --> X[Fact extraction<br/>llama3.1:8b, JSON schema]
+    X --> S[Fact-driven sub-queries]
+    Q --> R[Hybrid retrieval<br/>dense + BM25, RRF]
+    S --> R
+    E --> R
+    F --> R
+    R --> G{Similarity gate}
+    G -- too weak --> AB[Abstain]
+    G --> L[Generate<br/>structured JSON, cites S1..Sn]
+    L --> V[Verify citations<br/>+ lexical support]
+    V --> GR[Guardrails<br/>mandatory ECDD triggers]
+    GR --> OUT[Answer + sources + log]
+  end
+```
+
+Key design choices (each is switchable in `config.yaml`, and the evaluation ablates them):
+
+- **Section-level units.** AUSTRAC pages are split on their headings; the Rules are split on section numbers (`6-23`). Chunks never cross a section boundary, so a citation always names one rule. Chunk IDs are stable: `rules2025::6-23::0`.
+- **Contextual header.** Each chunk is embedded with its citation and heading path prepended, so a bare list of KYC fields still matches "trust customer".
+- **nomic-embed-text task prefixes** (`search_document:` / `search_query:`). Leaving them out noticeably hurts retrieval.
+- **Hybrid retrieval.** Legal text rewards exact terms ("source of wealth", "6-18"); BM25 catches those, dense retrieval catches paraphrase. Fused with reciprocal rank fusion.
+- **Fact extraction.** An 8B model reading a long scenario can miss the one decisive fact. The model first extracts a fixed set of CDD facts (PEP status, jurisdiction, SMR, risk rating…); each positive fact becomes a targeted sub-query, and the facts feed the guardrails.
+- **Structured output.** Ollama JSON-schema constrained generation, `temperature 0`, fixed seed, `num_ctx 8192`. Ollama's default context window silently truncates prompts with 8 sources.
+- **Verification.** Model citations are mapped back to retrieved chunks; labels that weren't retrieved are removed; each point's lexical support in its cited text is scored; confidence can only go down from what the model claims.
+- **Guardrails.** Under-applying CDD is the costly error. If the scenario contains a mandatory ECDD trigger (foreign PEP, FATF call-for-action jurisdiction, SMR with continuing relationship, nested services, unusual transaction, high risk rating) and the model said otherwise, the tier is escalated to `enhanced` **only if a retrieved source covers the trigger**, and that source is cited. The answer is flagged for review.
+- **Abstention.** If no retrieved passage is similar enough, the assistant says so instead of generating. The model can also return `insufficient_information` and list what is missing.
+- **Version lock.** The AML/CTF reform rolled out 31 March to 1 July 2026 and guidance is still being revised. Sources are fetched once, hashed and locked; `amlrag fetch --refresh` reports what changed.
+
+## Quick start
+
+**Prerequisites:** Python 3.10+, [Ollama](https://ollama.com) 0.5 or newer (for JSON-schema structured outputs) running locally.
+
+```bash
+ollama pull nomic-embed-text
+ollama pull llama3.1:8b
+ollama pull llama3.2:3b        # optional fallback for a faster live demo
+
+python -m venv .venv
+source .venv/bin/activate      # Windows: .venv\Scripts\activate
+pip install -e ".[dev]"
+
+amlrag doctor                  # checks Ollama, models, snapshot, index
+```
+
+**1. Build the knowledge base (once per snapshot)**
+
+```bash
+amlrag fetch                   # downloads AUSTRAC CDD guidance + crawls in-scope sub-pages; writes kb/snapshot.lock.json
+```
+
+Then put the legislation in `kb/manual/` (the Federal Register's download links change with each compilation, so these are placed by hand):
+
+- `kb/manual/rules2025.pdf`: latest compilation of the AML/CTF Rules 2025 from <https://www.legislation.gov.au/F2025L01026/latest> (it must include the 2026 amendments).
+- `kb/manual/amlctf-act.pdf` *(optional, recommended)*: latest compilation of the AML/CTF Act 2006 from <https://www.legislation.gov.au/C2004A01550/latest>.
+
+```bash
+amlrag fetch                   # records the manual files in the lock too
+amlrag build                   # parse -> chunk -> embed -> index
+amlrag stats --grep "6-23"     # sanity-check that rule sections parsed
+```
+
+Review `kb/snapshot.lock.json` and the per-document chunk counts that `build` prints. A document with 0 or 1 chunks means the parser didn't find its structure; see *Troubleshooting*.
+
+**2. Use it**
+
+```bash
+amlrag ask "A company's 45% shareholder is a serving member of a foreign parliament. Business account."
+amlrag ask --mode explain "What is the difference between source of wealth and source of funds?"
+amlrag serve                   # http://127.0.0.1:8000
+amlrag serve --fast            # uses generation.fallback_model
+```
+
+**3. Evaluate**
+
+```bash
+amlrag eval                    # full pipeline over data/gold/scenarios.jsonl -> results/<timestamp>-full/
+amlrag eval --preset all       # ablation: baseline -> hybrid -> +facts -> +guardrails, plus comparison.md
+amlrag eval --limit 5          # quick smoke run
+amlrag eval --judge lexical    # skip the LLM judge (faster, cruder faithfulness)
+```
+
+Each run writes `predictions.jsonl`, `metrics.json`, `config_used.yaml` and a `report.md` with acceptance results, confusion matrix, per-customer-type accuracy, confidence calibration, consistency groups and every failure with its retrieved and cited sources. See [docs/evaluation.md](docs/evaluation.md).
+
+**4. Tests**
+
+```bash
+pytest                                       # offline unit + integration tests (no Ollama needed)
+AMLRAG_RUN_EVAL=1 pytest tests/acceptance -v # live acceptance tests against config.yaml thresholds
+```
+
+On Windows PowerShell: `$env:AMLRAG_RUN_EVAL="1"; pytest tests/acceptance -v`.
+
+The acceptance tests are the "test" in Test-Driven RAG: each threshold in `config.yaml → eval.thresholds` (for example `mandatory_ecdd_recall: 1.0`, `under_application_rate_max: 0.05`) is its own test, so a change to chunking, prompts or retrieval that regresses a property fails loudly.
+
+## Working without Ollama (frontend work, CI)
+
+```bash
+amlrag build --offline && amlrag serve --offline
+```
+
+`--offline` swaps in a hashing embedder and a keyword stub generator. The UI shows a red banner; the answers are **not** model output. The index records which embedder built it, so rebuild with plain `amlrag build` before real use (the app refuses to query a mismatched index).
+
+## Project layout
+
+```
+config.yaml                 runtime config + acceptance thresholds (env override: AMLRAG_SECTION__KEY=value)
+kb/sources.yaml             source manifest (AUSTRAC pages, legislation, crawl scope)
+kb/snapshot.lock.json       what was fetched: URL, time, sha256  (created by `amlrag fetch`)
+kb/manual/                  hand-placed legislation PDFs
+data/gold/scenarios.jsonl   gold-standard test set (42 draft items)
+src/amlrag/
+  ingest/                   fetch.py, parse_html.py, parse_legislation.py, chunk.py, build.py
+  index/store.py            Chroma build/query + index manifest
+  retrieve/                 bm25.py, hybrid.py (RRF), facts.py (fact extraction + sub-queries)
+  generate/                 prompts.py, verify.py, guardrails.py
+  backends/                 ollama.py (REST client), offline.py (test doubles)
+  pipeline.py               Assistant.determine / Assistant.explain
+  querylog.py               SQLite log behind the Review gaps tab
+  eval/                     gold.py, metrics.py, judge.py, runner.py, report.py
+  server/                   FastAPI app + static UI (no build step)
+tests/                      offline tests; tests/acceptance = live gold-set thresholds
+docs/evaluation.md          metric definitions, calibration and review procedure
+```
+
+## Mapping to the three-week plan
+
+| Week | Plan | Where it lives |
+|---|---|---|
+| 1 | Knowledge base, chunking, nomic-embed-text + Chroma, Ollama llama3.1:8b, basic assistant | `amlrag fetch`, `amlrag build`, `amlrag ask` |
+| 2 | Gold set of ~35-40 scenarios; test retrieval, answers and citations; tune chunking and prompts; browser UI | `data/gold/`, `amlrag eval`, `config.yaml → chunking/retrieval`, `generate/prompts.py`, `amlrag serve` |
+| 3 | Effectiveness, faithfulness, attribution, consistency across customer types; final improvements; demo | `amlrag eval --preset all`, `report.md`, `comparison.md` |
+
+## Before you rely on the numbers
+
+1. **The gold set is a draft.** All 42 items are `status: draft`. The expected tiers were written from secondary summaries of Part 6 of the Rules and AUSTRAC's guidance structure, and several items are marked in `notes` as needing confirmation. Each item should be checked against the locked snapshot and set to `status: reviewed` with a `reviewer` (see [data/gold/README.md](data/gold/README.md)). Reports print how many items are still draft.
+2. **The parsers were developed against synthetic fixtures**, because AUSTRAC and the Federal Register weren't reachable from the build environment. After the first real `fetch` + `build`, check chunk counts and a few sections with `amlrag stats --grep`. The HTML parser looks for `<main>`, then `role=main`, then `<article>`; if AUSTRAC's markup differs, adjust `_main_region` / `_DROP_SELECTORS` in `ingest/parse_html.py`.
+3. **Calibrate `retrieval.min_dense_similarity`** on your real index using the unanswerable items (procedure in `docs/evaluation.md`).
+4. **Section numbers.** Gold references use Rules 2025 numbering (`rules2025::6-23`). If the 2026 amendments renumbered anything in the compilation you lock, update the references.
+
+## Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| `Is Ollama running at http://localhost:11434?` | `ollama serve`, then `amlrag doctor`. |
+| `Index was built with hash:512 but the configured embedder is ollama:nomic-embed-text` | You built offline; run `amlrag build`. |
+| `chunks.jsonl changed since the index was built` | Run `amlrag build` (it rebuilds both). |
+| A legislation document yields few sections | Print a page of extracted text and compare it with `section_pattern` in `kb/sources.yaml`: `python -c "from pathlib import Path; from amlrag.ingest.parse_legislation import pdf_to_pages; print(pdf_to_pages(Path('kb/manual/rules2025.pdf'))[40])"` |
+| Answers are slow (> 30 s) | `amlrag serve --fast`; lower `retrieval.final_k` to 6; set `retrieval.use_fact_extraction: false` (one fewer model call). |
+| Warning "prompt filled the context window" | Raise `generation.num_ctx` or lower `retrieval.final_k` / `chunking.max_words`. |
+
+## Sources in the knowledge base
+
+AUSTRAC *Customer due diligence* guidance (overview; initial CDD and customer-type guides; delayed initial CDD; enhanced CDD; politically exposed persons; ongoing CDD; customer risk ratings; transitioning existing customers; reliance; high-risk countries), plus Parts 1 and 6 of the *Anti-Money Laundering and Counter-Terrorism Financing Rules 2025* and, optionally, Parts 1-2 of the *AML/CTF Act 2006*. The exact list and URLs are in `kb/sources.yaml`. AUSTRAC and Federal Register content is Commonwealth material; check each site's copyright notice before redistributing the raw snapshot.

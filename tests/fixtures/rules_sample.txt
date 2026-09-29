@@ -1,0 +1,33 @@
+SYNTHETIC TEST FIXTURE Rules 2025 Compilation No. 1
+Contents
+Part 1—Preliminary
+1-1 Name ........ 1
+1-2 Definitions ........ 2
+Part 6—Customer due diligence
+Division 3—Simplified customer due diligence
+6-18 Simplified customer due diligence—beneficial owners ........ 40
+Division 5—Politically exposed persons
+6-23 Initial customer due diligence—politically exposed persons ........ 45
+SYNTHETIC TEST FIXTURE Rules 2025 Compilation No. 1
+Part 1—Preliminary
+1-1 Name
+This instrument is the synthetic test fixture version of the Rules and is used only by the parser tests.
+1-2 Definitions
+In this instrument, beneficial owner has the meaning given by the Act, and politically exposed person
+includes a domestic, foreign or international organisation politically exposed person.
+SYNTHETIC TEST FIXTURE Rules 2025 Compilation No. 1
+Part 6—Customer due diligence
+Division 3—Simplified customer due diligence
+6-18 Simplified customer due diligence—beneficial owners
+(1) A reporting entity need not identify the beneficial owners of a customer if the ML/TF risk of the customer is low and the customer is:
+(a) a government body; or
+(b) an entity regulated by APRA; or
+(c) an owners corporation of a strata scheme.
+6 This line starts with a number but is a wrapped continuation line and must not become a heading.
+(2) Subsection (1) does not apply to a self-managed superannuation fund.
+SYNTHETIC TEST FIXTURE Rules 2025 Compilation No. 1
+Division 5—Politically exposed persons
+6-23 Initial customer due diligence—politically exposed persons
+(1) If the customer, a beneficial owner, or a person acting on behalf of the customer is a foreign politically exposed person, the reporting entity must establish the source of wealth and source of funds of that person.
+(2) If the person is a domestic politically exposed person or an international organisation politically exposed person, subsection (1) applies only if the ML/TF risk is high.
+Note: See section 32 of the Act for enhanced customer due diligence.

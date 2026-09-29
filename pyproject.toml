@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "amlrag"
+version = "0.1.0"
+description = "Test-Driven RAG assistant for AML/CTF customer due diligence (CDD) tier determination, cited to AUSTRAC guidance and the AML/CTF Rules 2025."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "WIL Group 94 (RMIT)" }]
+dependencies = [
+  "chromadb>=1.0",
+  "rank-bm25>=0.2.2",
+  "beautifulsoup4>=4.12",
+  "lxml>=5.0",
+  "pypdf>=4.0",
+  "fastapi>=0.110",
+  "uvicorn[standard]>=0.29",
+  "pydantic>=2.5",
+  "pyyaml>=6.0",
+  "requests>=2.31",
+  "numpy>=1.26",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "httpx>=0.27"]
+
+[project.scripts]
+amlrag = "amlrag.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+amlrag = ["server/static/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+  "eval: runs the gold-standard evaluation against a live Ollama + built index (slow; opt-in with AMLRAG_RUN_EVAL=1)",
+]
+filterwarnings = ["ignore::DeprecationWarning"]

@@ -1,0 +1,73 @@
+"""Hybrid retrieval: dense (Chroma) + BM25, fused with weighted reciprocal rank fusion."""
+from __future__ import annotations
+
+from collections import defaultdict
+
+from amlrag.index.store import VectorStore
+from amlrag.models import Chunk, Retrieved
+from amlrag.retrieve.bm25 import BM25Index
+
+
+class Retriever:
+    def __init__(self, chunks: list[Chunk], store: VectorStore, dense_k: int = 20, bm25_k: int = 20,
+                 final_k: int = 8, rrf_k: int = 60, max_chunks_per_section: int = 2, use_hybrid: bool = True):
+        self.chunks = {c.chunk_id: c for c in chunks}
+        self.store = store
+        self.bm25 = BM25Index(chunks) if use_hybrid else None
+        self.dense_k = dense_k
+        self.bm25_k = bm25_k
+        self.final_k = final_k
+        self.rrf_k = rrf_k
+        self.max_per_section = max_chunks_per_section
+
+    @classmethod
+    def from_config(cls, chunks: list[Chunk], store: VectorStore, r) -> "Retriever":
+        return cls(chunks, store, r.dense_k, r.bm25_k, r.final_k, r.rrf_k, r.max_chunks_per_section, r.use_hybrid)
+
+    def search(self, primary: str, extra_queries: list[str] | None = None, k: int | None = None) -> list[Retrieved]:
+        """Fuse rankings from every (query, retriever) pair.
+
+        The user's own text has weight 1.0; fact-derived sub-queries 0.8, so
+        they add evidence without drowning out the scenario itself.
+        """
+        k = k or self.final_k
+        queries = [(primary, 1.0)] + [(q, 0.8) for q in (extra_queries or []) if q.strip()]
+        fused: dict[str, float] = defaultdict(float)
+        dense_best: dict[str, float] = {}
+        bm25_best: dict[str, float] = {}
+        matched: dict[str, list[str]] = defaultdict(list)
+
+        for q, w in queries:
+            for rank, (cid, sim) in enumerate(self.store.query(q, self.dense_k)):
+                if cid not in self.chunks:
+                    continue
+                fused[cid] += w / (self.rrf_k + rank + 1)
+                dense_best[cid] = max(sim, dense_best.get(cid, -1.0))
+                if q not in matched[cid]:
+                    matched[cid].append(q)
+            if self.bm25 is not None:
+                for rank, (cid, score) in enumerate(self.bm25.query(q, self.bm25_k)):
+                    fused[cid] += w / (self.rrf_k + rank + 1)
+                    bm25_best[cid] = max(score, bm25_best.get(cid, 0.0))
+                    if q not in matched[cid]:
+                        matched[cid].append(q)
+
+        ranked = sorted(fused.items(), key=lambda kv: -kv[1])
+        per_section: dict[str, int] = defaultdict(int)
+        out: list[Retrieved] = []
+        for cid, score in ranked:
+            chunk = self.chunks[cid]
+            if per_section[chunk.section_ref] >= self.max_per_section:
+                continue
+            per_section[chunk.section_ref] += 1
+            out.append(Retrieved(chunk=chunk, rrf_score=score, dense_similarity=dense_best.get(cid),
+                                 bm25_score=bm25_best.get(cid),
+                                 matched_queries=["primary" if m == primary else m for m in matched[cid]]))
+            if len(out) >= k:
+                break
+        return out
+
+    @staticmethod
+    def max_similarity(results: list[Retrieved]) -> float:
+        sims = [r.dense_similarity for r in results if r.dense_similarity is not None]
+        return max(sims) if sims else 0.0

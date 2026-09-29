@@ -1,0 +1,88 @@
+# AML/CTF CDD Compliance Assistant: runtime configuration.
+# Any value can be overridden with an environment variable, e.g.
+#   AMLRAG_OLLAMA__HOST=http://10.0.0.5:11434
+#   AMLRAG_GENERATION__MODEL=llama3.2:3b
+# (double underscore separates nesting levels)
+
+paths:
+  sources_manifest: kb/sources.yaml
+  raw_dir: kb/raw
+  manual_dir: kb/manual
+  lock_file: kb/snapshot.lock.json
+  sections_file: kb/processed/sections.jsonl
+  chunks_file: kb/processed/chunks.jsonl
+  chroma_dir: .index/chroma
+  query_log: logs/queries.db
+  results_dir: results
+  gold_file: data/gold/scenarios.jsonl
+
+ollama:
+  host: http://localhost:11434
+  timeout_s: 240
+  keep_alive: 15m
+
+embedding:
+  backend: ollama              # ollama | hash  (hash = offline, tests only)
+  model: nomic-embed-text
+  # nomic-embed-text was trained with task prefixes; leaving them out
+  # noticeably hurts retrieval.
+  document_prefix: "search_document: "
+  query_prefix: "search_query: "
+  batch_size: 32
+
+generation:
+  backend: ollama              # ollama | stub  (stub = offline UI/dev only, NOT real answers)
+  model: llama3.1:8b
+  fallback_model: llama3.2:3b  # used by `--fast` / if latency is a problem in the live demo
+  temperature: 0.0
+  seed: 42
+  # Ollama's default context window is small (2k-4k depending on version) and
+  # silently truncates the prompt. 8 sources x ~400 tokens needs more.
+  num_ctx: 8192
+  num_predict: 1024
+
+chunking:
+  max_words: 320
+  overlap_words: 40
+  min_words: 20
+
+retrieval:
+  collection: austrac_cdd
+  dense_k: 20
+  bm25_k: 20
+  final_k: 8
+  rrf_k: 60
+  max_chunks_per_section: 2
+  use_hybrid: true             # false = dense only (ablation baseline)
+  use_fact_extraction: true    # LLM extracts scenario facts -> targeted sub-queries
+  # If no retrieved chunk reaches this cosine similarity, the assistant abstains
+  # without calling the generator. Calibrate on the unanswerable gold items
+  # (see docs/evaluation.md); nomic-embed-text scores typically sit 0.35-0.80.
+  min_dense_similarity: 0.42
+
+verification:
+  # Share of a reasoning point's content words that must appear in its cited
+  # passages for the point to count as lexically supported.
+  min_support_overlap: 0.30
+  # If more than this share of reasoning points is unsupported, confidence is capped at "low".
+  max_unsupported_share: 0.34
+  guardrails: true
+  # escalate: a mandatory ECDD trigger found in the scenario escalates the tier to
+  #           "enhanced" (only when a retrieved source supports it) and marks needs_review.
+  # flag:     keep the model's tier but mark needs_review with a warning.
+  guardrail_mode: escalate
+
+eval:
+  judge_backend: ollama        # ollama | lexical
+  judge_model: llama3.1:8b     # ideally a *different* model family (e.g. qwen2.5:7b) to reduce self-grading bias
+  # Acceptance thresholds used by tests/acceptance (the "test" in Test-Driven RAG).
+  thresholds:
+    tier_accuracy_acceptable: 0.80
+    mandatory_ecdd_recall: 1.00
+    under_application_rate_max: 0.05
+    retrieval_recall_at_k: 0.80
+    citation_validity: 1.00
+    citation_precision: 0.60
+    faithfulness: 0.80
+    unanswerable_abstain_rate: 0.75
+    false_abstain_rate_max: 0.15

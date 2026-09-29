@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CDD Assistant</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="22" height="22"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m8.5 12 2.4 2.4 4.6-4.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div>
+        <div class="brand-name">CDD Assistant</div>
+        <div class="brand-sub">AML/CTF customer due diligence, cited to AUSTRAC guidance</div>
+      </div>
+    </div>
+    <div class="status" id="status">
+      <span class="dot" id="status-dot"></span><span id="status-text">Connecting…</span>
+    </div>
+  </header>
+
+  <div class="stub-banner" id="stub-banner" hidden>
+    Offline stub mode: answers are keyword heuristics for UI testing, not model output. Do not rely on them.
+  </div>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab active" role="tab" data-tab="determine" aria-selected="true">Determine tier</button>
+    <button class="tab" role="tab" data-tab="explain" aria-selected="false">Explain an obligation</button>
+    <button class="tab" role="tab" data-tab="gaps" aria-selected="false">Review gaps</button>
+  </nav>
+
+  <main class="layout" id="ask-view">
+    <section class="card input-card">
+      <label class="field-label" for="query" id="query-label">Customer scenario</label>
+      <textarea id="query" rows="7" maxlength="4000"
+        placeholder="Describe the customer: legal form, who owns or controls it, PEP status, countries involved, the service, and your risk rating."></textarea>
+      <div class="examples" id="examples"></div>
+      <div class="actions">
+        <span class="hint" id="hint">Ctrl + Enter to submit</span>
+        <button class="primary" id="submit">Determine tier</button>
+      </div>
+    </section>
+
+    <section class="results" id="results" aria-live="polite">
+      <div class="empty" id="empty">
+        <p class="empty-title">No determination yet</p>
+        <p>Describe a customer scenario and the assistant will say which CDD tier applies, why, and which clause each point relies on.</p>
+      </div>
+    </section>
+  </main>
+
+  <main class="gaps-view" id="gaps-view" hidden>
+    <section class="tiles" id="gap-tiles"></section>
+    <section class="card">
+      <div class="gaps-head">
+        <h2>Questions the assistant could not answer confidently</h2>
+        <button class="ghost" id="refresh-gaps">Refresh</button>
+      </div>
+      <p class="muted">Abstentions, low-confidence answers, guardrail escalations and answers marked not helpful. Use this list to decide where staff training or new guidance is needed.</p>
+      <div class="table-wrap"><table class="gaps-table" id="gaps-table"></table></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    Decision support only. Every determination must be confirmed by a compliance officer against your AML/CTF program.
+    <span id="snapshot-note"></span>
+  </footer>
+
+  <template id="spinner-tpl">
+    <div class="card loading"><div class="spinner"></div><div><div class="loading-title">Working</div><div class="muted" id="elapsed">Retrieving guidance…</div></div></div>
+  </template>
+  <script src="/static/app.js"></script>
+</body>
+</html>
