@@ -2,7 +2,7 @@
 
 **WIL Project, Group 94 (RMIT).** A Test-Driven RAG assistant that helps AML/CTF compliance officers determine the correct customer due diligence (CDD) tier for a customer scenario, with every determination cited to the specific AUSTRAC guidance section or AML/CTF Rules 2025 clause it relies on.
 
-Everything runs locally: **Ollama** (`qwen3.5:9b` writes the answers, `nomic-embed-text` searches, `llama3.1:8b` grades answers during evaluation) and **Chroma** as the vector store. No customer data leaves the machine.
+Everything runs locally: **Ollama** (`qwen3.5:9b` writes the answers, `qwen3-embedding:8b` searches, `llama3.1:8b` grades answers during evaluation) and **Chroma** as the vector store. No customer data leaves the machine.
 
 > Decision support only. Determinations must be confirmed by a compliance officer against the reporting entity's AML/CTF program.
 
@@ -25,7 +25,7 @@ flowchart LR
     A[kb/sources.yaml] --> B[Fetch + version lock<br/>kb/snapshot.lock.json]
     B --> C[Parse<br/>AUSTRAC HTML by heading<br/>Rules PDF by section 6-xx]
     C --> D[Chunk within sections<br/>+ contextual header]
-    D --> E[(Chroma<br/>nomic-embed-text)]
+    D --> E[(Chroma<br/>qwen3-embedding:8b)]
     D --> F[(BM25)]
   end
   subgraph Answer ["amlrag ask / serve"]
@@ -48,7 +48,7 @@ Key design choices (each is switchable in `config.yaml`, and the evaluation abla
 
 - **Section-level units.** AUSTRAC pages are split on their headings; the Rules are split on section numbers (`6-23`). Chunks never cross a section boundary, so a citation always names one rule. Chunk IDs are stable: `rules2025::6-23::0`.
 - **Contextual header.** Each chunk is embedded with its citation and heading path prepended, so a bare list of KYC fields still matches "trust customer".
-- **nomic-embed-text task prefixes** (`search_document:` / `search_query:`). Leaving them out noticeably hurts retrieval.
+- **Embedding prompt format.** Each embedding model expects its own format, and leaving it out noticeably hurts retrieval. Qwen3-Embedding gets a task instruction on queries only (`Instruct: …\nQuery:`); formats for nomic-embed-text, EmbeddingGemma and mxbai are also in `config.yaml → embedding.prompt_formats`, picked automatically by model name. Each embedding model gets its own index folder under `.index/chroma/`, so switching never mixes vectors.
 - **Hybrid retrieval.** Legal text rewards exact terms ("source of wealth", "6-18"); BM25 catches those, dense retrieval catches paraphrase. Fused with reciprocal rank fusion.
 - **Fact extraction.** An 8B model reading a long scenario can miss the one decisive fact. The model first extracts a fixed set of CDD facts (PEP status, jurisdiction, SMR, risk rating…); each positive fact becomes a targeted sub-query, and the facts feed the guardrails.
 - **Structured output.** Ollama JSON-schema constrained generation, `temperature 0`, fixed seed, `num_ctx 8192`. Ollama's default context window silently truncates prompts with 8 sources. Qwen 3.5's "thinking" phase is switched off (`generation.think: false`): it is slow and its reasoning can leak into the JSON.
@@ -72,8 +72,9 @@ A working pipeline isn't enough on its own; the evaluation is built to answer "i
 **Prerequisites:** Python 3.10+, [Ollama](https://ollama.com) 0.5 or newer (for JSON-schema structured outputs) running locally.
 
 ```bash
-ollama pull nomic-embed-text   # search
+ollama pull qwen3-embedding:8b # search (4.7 GB)
 ollama pull qwen3.5:9b         # answers (6.6 GB)
+ollama pull nomic-embed-text   # optional: Milestone 1 embedding model, for the comparison
 ollama pull llama3.1:8b        # grades answers during evaluation; also the Milestone 1 baseline
 ollama pull qwen3.5:4b         # optional: faster fallback for the live demo (--fast)
 
@@ -141,7 +142,9 @@ On Windows PowerShell: `$env:AMLRAG_RUN_EVAL="1"; pytest tests/acceptance -v`.
 
 The acceptance tests are the "test" in Test-Driven RAG: each threshold in `config.yaml → eval.thresholds` (for example `mandatory_ecdd_recall: 1.0`, `under_application_rate_max: 0.05`) is its own test, so a change to chunking, prompts or retrieval that regresses a property fails loudly.
 
-## Choosing the answer model
+## Choosing the models
+
+### Answer model
 
 `config.yaml → generation.model` is `qwen3.5:9b`. It replaced the Milestone 1 choice, `llama3.1:8b`, because it is two years newer and scores far higher on published knowledge and reasoning benchmarks at a laptop-friendly size (6.6 GB). The benchmarks don't measure citing legal text correctly, so compare the two on your own gold set and report what you find:
 
@@ -156,6 +159,22 @@ Results folders are named after the preset and model (e.g. `20261002-1410-full-q
 - **Judge.** `eval.judge_model` stays `llama3.1:8b`, a different model family from the answer model, so answers aren't graded by the model that wrote them. If you evaluate with `--model llama3.1:8b`, switch the judge (e.g. `--judge lexical`, or `judge_model: qwen3.5:9b`) for that run.
 - **Memory.** On a 16 GB Mac the answer model and the judge don't both fit at once, so Ollama swaps them during evaluation. It works, just slower; `--judge lexical` avoids it while iterating. With 32 GB+, `qwen3.5:27b` is a large step up.
 - **Thinking.** `generation.think: false` switches off Qwen 3.5's reasoning phase. Set it to `null` to leave the model's default. Models that can't think ignore it; if your Ollama version rejects it, the client drops it automatically.
+
+### Embedding model
+
+`config.yaml → embedding.model` is `qwen3-embedding:8b`, replacing the Milestone 1 choice, `nomic-embed-text`. It was No. 1 on the multilingual MTEB leaderboard when released (June 2025) and scores well above nomic on published retrieval benchmarks, though the two models' published scores come from different MTEB versions. It is also 4.7 GB instead of 0.3 GB. Compare the two on your gold set:
+
+```bash
+amlrag build                                          # qwen3-embedding:8b index
+amlrag build --embedding-model nomic-embed-text       # second index, kept alongside
+amlrag eval --preset full --judge lexical
+amlrag eval --preset full --judge lexical --embedding-model nomic-embed-text
+amlrag compare results/<qwen3-embedding run> results/<nomic run>
+```
+
+Look at `retrieval_recall_at_k` and `walert_ndcg_at_5` first; those isolate search quality. After switching embedding models, recalibrate `retrieval.min_dense_similarity` (see `docs/evaluation.md`): similarity scores sit in different ranges for different models.
+
+**Memory on a 16 GB Mac:** the embedding model (4.7 GB) and the answer model (6.6 GB) don't both fit in the memory macOS gives the GPU, so Ollama loads one, then the other, for each question. Answers still work but each takes several seconds longer. If that's too slow for the demo, `--embedding-model qwen3-embedding:4b` (2.5 GB, rebuild its index first) fits alongside the answer model.
 
 ## Working without Ollama (frontend work, CI)
 
@@ -191,7 +210,7 @@ docs/evaluation.md          metric definitions, calibration and review procedure
 
 | Week | Plan | Where it lives |
 |---|---|---|
-| 1 | Knowledge base, chunking, nomic-embed-text + Chroma, Ollama llama3.1:8b, basic assistant | `amlrag fetch`, `amlrag build`, `amlrag ask` (the answer model has since moved to `qwen3.5:9b`; see *Choosing the answer model*) |
+| 1 | Knowledge base, chunking, nomic-embed-text + Chroma, Ollama llama3.1:8b, basic assistant | `amlrag fetch`, `amlrag build`, `amlrag ask` (the models have since moved to `qwen3.5:9b` and `qwen3-embedding:8b`; see *Choosing the models*) |
 | 2 | Gold set of ~35-40 scenarios; test retrieval, answers and citations; tune chunking and prompts; browser UI | `data/gold/`, `amlrag eval`, `config.yaml → chunking/retrieval`, `generate/prompts.py`, `amlrag serve` |
 | 3 | Effectiveness, faithfulness, attribution, consistency across customer types; final improvements; demo | `amlrag eval --preset all`, `report.md`, `comparison.md` (with the closed-book baseline, Walert measures and fairness) |
 
@@ -209,7 +228,8 @@ The ablation presets also map onto the brief's iterations: run `baseline` on the
 | Symptom | Fix |
 |---|---|
 | `Is Ollama running at http://localhost:11434?` | `ollama serve`, then `amlrag doctor`. |
-| `Index was built with hash:512 but the configured embedder is ollama:nomic-embed-text` | You built offline; run `amlrag build`. |
+| `No index at .index/chroma/<model>` | That embedding model has no index yet: `amlrag build` (add `--embedding-model <name>` if you're using a different one). |
+| Everything is refused ("no guidance close enough") | `retrieval.min_dense_similarity` is too high for this embedding model; calibrate it (docs/evaluation.md). |
 | `chunks.jsonl changed since the index was built` | Run `amlrag build` (it rebuilds both). |
 | A legislation document yields few sections | Print a page of extracted text and compare it with `section_pattern` in `kb/sources.yaml`: `python -c "from pathlib import Path; from amlrag.ingest.parse_legislation import pdf_to_pages; print(pdf_to_pages(Path('kb/manual/rules2025.pdf'))[40])"` |
 | Answers are slow (> 30 s) | Check `generation.think` is `false`; `amlrag serve --fast` (uses `qwen3.5:4b`); lower `retrieval.final_k` to 6; set `retrieval.use_fact_extraction: false` (one fewer model call). |

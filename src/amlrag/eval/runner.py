@@ -11,7 +11,7 @@ from typing import Any
 
 import yaml
 
-from amlrag.backends import make_judge
+from amlrag.backends import index_dir, make_judge
 from amlrag.config import Config
 from amlrag.eval.gold import GoldItem, load_gold
 from amlrag.eval.judge import Judge
@@ -81,6 +81,11 @@ def model_slug(cfg: Config) -> str:
     return re.sub(r"[^A-Za-z0-9.]+", "-", name).strip("-")
 
 
+def run_slug(cfg: Config) -> str:
+    """Answer model + embedding model, e.g. "qwen3.5-9b_qwen3-embedding-8b"."""
+    return f"{model_slug(cfg)}_{index_dir(cfg).name}"
+
+
 def _select(items: list[GoldItem], ids, tags, limit) -> list[GoldItem]:
     if ids:
         items = [i for i in items if i.id in ids]
@@ -130,7 +135,7 @@ def run_eval(cfg: Config, preset: str = "full", gold_path: str | None = None, li
     available_docs = {c.doc_id for c in assistant.retriever.chunks.values()}
 
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    out_dir = out_dir or cfg.path("results_dir") / f"{stamp}-{preset}-{model_slug(cfg)}"
+    out_dir = out_dir or cfg.path("results_dir") / f"{stamp}-{preset}-{run_slug(cfg)}"
     out_dir.mkdir(parents=True, exist_ok=True)
     judge_llm = make_judge(cfg)
     judge = Judge(judge_llm, cfg.path("results_dir") / ".judge_cache.json") if judge_llm else None
@@ -184,7 +189,7 @@ def run_eval(cfg: Config, preset: str = "full", gold_path: str | None = None, li
     (out_dir / "metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
     (out_dir / "config_used.yaml").write_text(yaml.safe_dump(cfg.to_dict(), sort_keys=False), encoding="utf-8")
     write_report(out_dir / "report.md", items, preds, metrics)
-    latest = cfg.path("results_dir") / f"latest-{preset}-{model_slug(cfg)}.json"
+    latest = cfg.path("results_dir") / f"latest-{preset}-{run_slug(cfg)}.json"
     latest.write_text(json.dumps({"dir": str(out_dir), "headline": metrics["headline"]}, indent=2),
                       encoding="utf-8")
     return out_dir, metrics
@@ -200,7 +205,7 @@ def _item_ok(item: GoldItem, pred: dict[str, Any]) -> bool:
 
 def run_all_presets(cfg: Config, **kwargs) -> Path:
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    base = cfg.path("results_dir") / f"{stamp}-ablation-{model_slug(cfg)}"
+    base = cfg.path("results_dir") / f"{stamp}-ablation-{run_slug(cfg)}"
     results = {}
     for preset in PRESETS:
         print(f"\n=== preset: {preset} ===")

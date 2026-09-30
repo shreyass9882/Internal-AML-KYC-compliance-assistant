@@ -1,4 +1,4 @@
-"""Ollama REST client for embeddings (nomic-embed-text) and chat (qwen3.5:9b by default)."""
+"""Ollama REST client for embeddings (qwen3-embedding:8b by default) and chat (qwen3.5:9b by default)."""
 from __future__ import annotations
 
 import json
@@ -65,7 +65,11 @@ class OllamaClient:
 
 
 class OllamaEmbedder:
-    """nomic-embed-text via /api/embed (batched), falling back to legacy /api/embeddings."""
+    """Embeddings via /api/embed (batched), falling back to legacy /api/embeddings.
+
+    document_prefix / query_prefix carry the model's prompt format, e.g. Qwen3-Embedding's
+    "Instruct: ...\nQuery:" on queries only, or nomic-embed-text's "search_document: " / "search_query: ".
+    """
 
     def __init__(self, client: OllamaClient, model: str, document_prefix: str = "", query_prefix: str = "",
                  batch_size: int = 32):

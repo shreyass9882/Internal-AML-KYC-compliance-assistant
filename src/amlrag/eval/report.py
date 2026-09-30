@@ -182,21 +182,34 @@ def write_comparison(path: Path, results: dict[str, dict[str, Any]], title: str 
 
 def compare_runs(run_dirs: list[Path], out_path: Path) -> str:
     """Side-by-side table of any finished runs (e.g. the same preset with two different models)."""
+    loaded = [(Path(d), json.loads((Path(d) / "metrics.json").read_text(encoding="utf-8"))) for d in run_dirs]
+
+    def short(name) -> str:
+        return str(name or "?").replace("ollama:", "")
+
+    # Label columns by whatever differs between the runs: preset, answer model, embedding model.
+    vary = {key: len({str(m.get("run", {}).get(key)) for _, m in loaded}) > 1
+            for key in ("preset", "generator", "embedder")}
     results: dict[str, dict[str, Any]] = {}
     notes = []
-    for d in run_dirs:
-        m = json.loads((Path(d) / "metrics.json").read_text(encoding="utf-8"))
+    for d, m in loaded:
         run = m.get("run", {})
-        label = f"{run.get('preset', '?')} · {str(run.get('generator', '?')).replace('ollama:', '')}"
+        parts = [str(run.get("preset", "?"))]
+        if vary["generator"] or not vary["embedder"]:
+            parts.append(short(run.get("generator")))
+        if vary["embedder"]:
+            parts.append(short(run.get("embedder")))
+        label = " · ".join(parts)
         while label in results:
             label += "'"
         results[label] = m
-        notes.append(f"{label}: {Path(d).name}, {run.get('n_items')} items, judge {run.get('judge')}, "
+        notes.append(f"{label}: {d.name}, {run.get('n_items')} items, answers {short(run.get('generator'))}, "
+                     f"embeddings {short(run.get('embedder'))}, judge {run.get('judge')}, "
                      f"snapshot {run.get('snapshot')}, index {run.get('index_digest')}")
     digests = {r.get("run", {}).get("index_digest") for r in results.values()}
     ns = {r.get("run", {}).get("n_items") for r in results.values()}
     if len(digests) > 1 or len(ns) > 1:
-        notes.insert(0, "**Warning:** these runs used different indexes or numbers of items, so they are not "
+        notes.insert(0, "**Warning:** these runs used different chunks or numbers of items, so they are not "
                         "directly comparable.")
     write_comparison(out_path, results, "Run comparison",
                      "Each column is one evaluation run. Only compare runs made on the same index and gold set.",

@@ -23,12 +23,24 @@ ollama:
 
 embedding:
   backend: ollama              # ollama | hash  (hash = offline, tests only)
-  model: nomic-embed-text
-  # nomic-embed-text was trained with task prefixes; leaving them out
-  # noticeably hurts retrieval.
-  document_prefix: "search_document: "
-  query_prefix: "search_query: "
-  batch_size: 32
+  model: qwen3-embedding:8b    # Milestone 1 used nomic-embed-text; compare with --embedding-model nomic-embed-text
+  # Each embedding model expects its own prompt format; leaving it out noticeably hurts
+  # retrieval. The entry matching the model's name (before the ":") is used. Set
+  # document_prefix / query_prefix here to override it for a model not listed.
+  prompt_formats:
+    qwen3-embedding:           # instruction on queries only (Qwen3-Embedding model card)
+      document: ""
+      query: "Instruct: Given a question or customer scenario from an Australian AML/CTF compliance officer, retrieve passages of AUSTRAC guidance or the AML/CTF Rules that answer it\nQuery:"
+    nomic-embed-text:
+      document: "search_document: "
+      query: "search_query: "
+    embeddinggemma:
+      document: "title: none | text: "
+      query: "task: search result | query: "
+    mxbai-embed-large:
+      document: ""
+      query: "Represent this sentence for searching relevant passages: "
+  batch_size: 16
 
 generation:
   backend: ollama              # ollama | stub  (stub = offline UI/dev only, NOT real answers)
@@ -60,9 +72,11 @@ retrieval:
   use_hybrid: true             # false = dense only (ablation baseline)
   use_fact_extraction: true    # LLM extracts scenario facts -> targeted sub-queries
   # If no retrieved chunk reaches this cosine similarity, the assistant abstains
-  # without calling the generator. Calibrate on the unanswerable gold items
-  # (see docs/evaluation.md); nomic-embed-text scores typically sit 0.35-0.80.
-  min_dense_similarity: 0.42
+  # without calling the generator. Similarity ranges differ between embedding
+  # models, so calibrate on the unanswerable gold items after every embedder change
+  # (see docs/evaluation.md). 0.30 is a deliberately low starting point: too high
+  # and the assistant refuses real questions.
+  min_dense_similarity: 0.30
 
 verification:
   # Share of a reasoning point's content words that must appear in its cited

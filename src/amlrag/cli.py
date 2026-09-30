@@ -17,6 +17,8 @@ def _cfg(args):
                  .override("eval.judge_backend", "lexical")
     if getattr(args, "model", None):
         cfg = cfg.override("generation.model", args.model)
+    if getattr(args, "embedding_model", None):
+        cfg = cfg.override("embedding.model", args.embedding_model)
     if getattr(args, "fast", False):
         cfg = cfg.override("generation.model", cfg.generation.fallback_model)
     if getattr(args, "closed_book", False):
@@ -40,7 +42,7 @@ def cmd_fetch(args) -> int:
 
 
 def cmd_build(args) -> int:
-    from amlrag.backends import make_embedder
+    from amlrag.backends import index_dir, make_embedder
     from amlrag.index.store import build_index
     from amlrag.ingest.build import build_chunks, read_chunks
     from amlrag.ingest.fetch import snapshot_date
@@ -63,10 +65,10 @@ def cmd_build(args) -> int:
     def progress(done, total):
         print(f"\r  embedding {done}/{total}", end="", flush=True)
 
-    manifest = build_index(chunks, embedder, cfg.path("chroma_dir"), cfg.retrieval.collection,
+    manifest = build_index(chunks, embedder, index_dir(cfg), cfg.retrieval.collection,
                            snapshot_date(cfg), progress)
     print(f"\nIndexed {manifest['chunks']} chunks with {manifest['embedder']} (dim {manifest['dim']}) "
-          f"into {cfg.path('chroma_dir')}")
+          f"into {index_dir(cfg)}")
     return 0
 
 
@@ -143,7 +145,7 @@ def cmd_serve(args) -> int:
 
 
 def cmd_doctor(args) -> int:
-    from amlrag.backends import make_client
+    from amlrag.backends import index_dir, make_client
     from amlrag.index.store import read_manifest
     from amlrag.ingest.fetch import load_lock
 
@@ -152,7 +154,7 @@ def cmd_doctor(args) -> int:
     lock = load_lock(cfg)
     n_docs = len(lock.get("documents", {}))
     print(f"[{'ok' if n_docs else '--'}] snapshot: {n_docs} documents locked (created {lock.get('snapshot_created')})")
-    manifest = read_manifest(cfg.path("chroma_dir"))
+    manifest = read_manifest(index_dir(cfg))
     print(f"[{'ok' if manifest else '--'}] index: " +
           (f"{manifest['chunks']} chunks, {manifest['embedder']}, built {manifest['built_at'][:19]}" if manifest
            else "not built (run `amlrag build`)"))
@@ -242,6 +244,7 @@ def main(argv: list[str] | None = None) -> None:
 
     sp = add("build", cmd_build, "parse, chunk, embed and index the snapshot")
     sp.add_argument("--skip-index", action="store_true", help="parse and chunk only")
+    sp.add_argument("--embedding-model", help="embedding model for this index, e.g. nomic-embed-text")
 
     sp = add("ask", cmd_ask, "ask a question from the terminal")
     sp.add_argument("text", nargs="*")
@@ -249,6 +252,7 @@ def main(argv: list[str] | None = None) -> None:
     sp.add_argument("--json", action="store_true")
     sp.add_argument("--fast", action="store_true", help="use generation.fallback_model")
     sp.add_argument("--model", help="answer model for this run, e.g. llama3.1:8b (overrides config.yaml)")
+    sp.add_argument("--embedding-model", help="embedding model (its index must be built), e.g. nomic-embed-text")
     sp.add_argument("--closed-book", action="store_true",
                     help="answer with no retrieval (the baseline RAG is compared against)")
 
@@ -262,6 +266,7 @@ def main(argv: list[str] | None = None) -> None:
     sp.add_argument("--judge", choices=["ollama", "lexical"])
     sp.add_argument("--fast", action="store_true")
     sp.add_argument("--model", help="answer model for this run, e.g. llama3.1:8b (overrides config.yaml)")
+    sp.add_argument("--embedding-model", help="embedding model (its index must be built), e.g. nomic-embed-text")
 
     sp = add("compare", cmd_compare, "side-by-side table of finished eval runs (e.g. two models)")
     sp.add_argument("runs", nargs="+", help="results/<run> folders")
@@ -272,8 +277,10 @@ def main(argv: list[str] | None = None) -> None:
     sp.add_argument("--port", type=int, default=8000)
     sp.add_argument("--fast", action="store_true")
     sp.add_argument("--model", help="answer model for this run, e.g. llama3.1:8b (overrides config.yaml)")
+    sp.add_argument("--embedding-model", help="embedding model (its index must be built), e.g. nomic-embed-text")
 
-    add("doctor", cmd_doctor, "check Ollama, models, snapshot and index")
+    sp = add("doctor", cmd_doctor, "check Ollama, models, snapshot and index")
+    sp.add_argument("--embedding-model")
     sp = add("log", cmd_log, "summarise or purge the query log")
     sp.add_argument("--purge-all", action="store_true", help="delete every logged query")
     sp.add_argument("--purge-older-than", type=int, metavar="DAYS")

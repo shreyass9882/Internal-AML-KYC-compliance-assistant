@@ -6,7 +6,7 @@ import time
 from typing import Any
 
 from amlrag import ABSTAIN
-from amlrag.backends import make_embedder, make_llm
+from amlrag.backends import index_dir, make_embedder, make_llm
 from amlrag.config import Config
 from amlrag.generate.guardrails import apply_guardrails
 from amlrag.generate.prompts import (
@@ -57,7 +57,7 @@ class Assistant:
     def from_config(cls, cfg: Config, llm=None) -> "Assistant":
         embedder = make_embedder(cfg)
         chunks = read_chunks(cfg.path("chunks_file"))
-        store = VectorStore(cfg.path("chroma_dir"), cfg.retrieval.collection, embedder, chunks)
+        store = VectorStore(index_dir(cfg), cfg.retrieval.collection, embedder, chunks)
         retriever = Retriever.from_config(chunks, store, cfg.retrieval)
         return cls(cfg, retriever, llm or make_llm(cfg), embedder.name,
                    store.manifest.get("snapshot") or snapshot_date(cfg))

@@ -50,13 +50,13 @@ def offline_cfg(tmp_path_factory):
 
 @pytest.fixture(scope="session")
 def built_cfg(offline_cfg):
-    from amlrag.backends import make_embedder
+    from amlrag.backends import index_dir, make_embedder
     from amlrag.index.store import build_index
     from amlrag.ingest.build import build_chunks, read_chunks
 
     build_chunks(offline_cfg)
     chunks = read_chunks(offline_cfg.path("chunks_file"))
-    build_index(chunks, make_embedder(offline_cfg), offline_cfg.path("chroma_dir"),
+    build_index(chunks, make_embedder(offline_cfg), index_dir(offline_cfg),
                 offline_cfg.retrieval.collection, "2026-01-01")
     return offline_cfg
 

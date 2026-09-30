@@ -67,3 +67,32 @@ def _chunk(cid="d::s::0"):
 def test_retrieved_to_dict_rounding():
     d = Retrieved(_chunk(), 0.0123456, 0.876543, 3.14159).to_dict()
     assert d["dense_similarity"] == 0.8765 and d["bm25_score"] == 3.142
+
+
+def test_embedding_prompt_formats(offline_cfg):
+    from amlrag.backends import embedding_prefixes, index_dir
+
+    cfg = offline_cfg.override("embedding.backend", "ollama")
+    q3 = cfg.override("embedding.model", "qwen3-embedding:8b")
+    doc, query = embedding_prefixes(q3)
+    assert doc == "" and query.startswith("Instruct: ") and query.endswith("\nQuery:")
+    assert embedding_prefixes(cfg.override("embedding.model", "nomic-embed-text")) == ("search_document: ",
+                                                                                         "search_query: ")
+    assert embedding_prefixes(cfg.override("embedding.model", "qwen3-embedding:4b"))[1] == query  # same family
+    custom = cfg.override("embedding.model", "some-new-embedder").override("embedding.query_prefix", "q: ")
+    assert embedding_prefixes(custom) == ("", "q: ")
+    assert embedding_prefixes(cfg.override("embedding.model", "unknown-model")) == ("", "")
+    # Every embedding model gets its own index folder.
+    assert index_dir(q3).name == "qwen3-embedding-8b"
+    assert index_dir(cfg.override("embedding.model", "nomic-embed-text")).name == "nomic-embed-text"
+    assert index_dir(offline_cfg).name == "hash-512"
+
+
+def test_embedding_model_flag(built_cfg):
+    import argparse
+
+    from amlrag.cli import _cfg
+
+    args = argparse.Namespace(config=str(built_cfg.root / "config.yaml"), offline=False, model=None,
+                              embedding_model="nomic-embed-text", fast=False, closed_book=False)
+    assert _cfg(args).embedding.model == "nomic-embed-text"

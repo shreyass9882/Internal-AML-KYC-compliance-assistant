@@ -94,7 +94,7 @@ The report lists every flip. If one appears, check the retrieved sources and ext
 
 ## Calibrating the abstention threshold
 
-`retrieval.min_dense_similarity` decides when the assistant refuses before calling the model. The default (0.42) is a starting guess; tune it on your index:
+`retrieval.min_dense_similarity` decides when the assistant refuses before calling the model. The default (0.30) is a deliberately low starting guess, and similarity ranges differ between embedding models, so tune it on your index every time you change the embedding model:
 
 1. Run `amlrag eval --judge lexical` once.
 2. Read `checks.max_similarity` for each item in `predictions.jsonl` (also in `amlrag ask --json` output).
@@ -121,7 +121,7 @@ For `closed_book`, the references the model names ("AML/CTF Rules 2025 s 6-23", 
 
 The table shows which component moves which metric. The expected pattern is that hybrid retrieval lifts recall on rule-number and exact-term questions, fact extraction lifts mandatory-ECDD recall on multi-party scenarios (company and trust beneficial owners), and guardrails remove residual under-application at some cost to over-application. Report what you actually observe, including any component that didn't help.
 
-## Comparing answer models
+## Comparing models
 
 Run the same preset with each model on the same index and gold set, then put the runs side by side:
 
@@ -130,6 +130,17 @@ amlrag eval --preset full --model llama3.1:8b --judge lexical
 amlrag eval --preset full --judge lexical          # qwen3.5:9b
 amlrag compare results/<first run> results/<second run>
 ```
+
+For embedding models, build an index for each (each goes in its own folder), then evaluate with `--embedding-model`:
+
+```bash
+amlrag build --embedding-model nomic-embed-text
+amlrag eval --preset full --judge lexical --embedding-model nomic-embed-text
+amlrag eval --preset full --judge lexical          # qwen3-embedding:8b
+amlrag compare results/<first run> results/<second run>
+```
+
+Retrieval recall and NDCG isolate the effect of the embedding model; tier accuracy shows whether better search turns into better answers. Recalibrate the abstention threshold for each embedding model before comparing refusal rates.
 
 Use the same judge for every run you compare. `--judge lexical` is the simplest way to guarantee that; for final numbers use an LLM judge that is a different family from both answer models.
 
