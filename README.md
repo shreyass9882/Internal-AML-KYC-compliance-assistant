@@ -15,7 +15,7 @@ Everything runs locally: **Ollama** (`llama3.1:8b` for generation, `nomic-embed-
 | Compliance officer: *which CDD tier applies to this scenario?* | **Determine tier** mode returns `simplified`, `standard`, `enhanced` or `insufficient_information`, with reasoning and required measures. Guardrails stop the model from under-applying CDD when the scenario contains a mandatory enhanced CDD trigger. |
 | New team member: *plain-language explanations* | **Explain an obligation** mode: short, plain-English key points, each cited. |
 | Compliance officer: *every answer cited so it can be defended in an audit* | Every point carries citations like `AML/CTF Rules 2025, s 6-23` or `AUSTRAC guidance: Enhanced customer due diligence › When you must apply ECDD`, linked to the source. Citations are verified after generation: invented citations are stripped, unsupported points are flagged, and an answer with no valid citation is withheld. |
-| Compliance manager: *which questions can't it answer confidently?* | Every query is logged. The **Review gaps** tab lists abstentions, low-confidence answers, guardrail escalations and answers marked *not helpful*. |
+| Compliance manager: *which questions can't it answer confidently?* | Every query is logged, with identifiers masked and rows deleted after 30 days by default. The **Review gaps** tab lists abstentions, low-confidence answers, guardrail escalations and answers marked *not helpful*. |
 
 ## Architecture
 
@@ -56,6 +56,16 @@ Key design choices (each is switchable in `config.yaml`, and the evaluation abla
 - **Guardrails.** Under-applying CDD is the costly error. If the scenario contains a mandatory ECDD trigger (foreign PEP, FATF call-for-action jurisdiction, SMR with continuing relationship, nested services, unusual transaction, high risk rating) and the model said otherwise, the tier is escalated to `enhanced` **only if a retrieved source covers the trigger**, and that source is cited. The answer is flagged for review.
 - **Abstention.** If no retrieved passage is similar enough, the assistant says so instead of generating. The model can also return `insufficient_information` and list what is missing.
 - **Version lock.** The AML/CTF reform rolled out 31 March to 1 July 2026 and guidance is still being revised. Sources are fetched once, hashed and locked; `amlrag fetch --refresh` reports what changed.
+- **Privacy.** Questions can contain customer details. Before a question is logged, emails, phone numbers, dates, addresses, long numbers (account, card, TFN, ABN) and most names are masked; the log keeps only system-generated reasons, never the model's wording; rows expire after `query_log.retention_days`. Set `query_log.store_text: none` to keep outcomes only. `amlrag log --purge-all` clears it. A lone first name at the start of a sentence is not caught, so the UI asks staff not to type names.
+
+## How we show it adds value
+
+A working pipeline isn't enough on its own; the evaluation is built to answer "is this better than the alternative, and for whom?":
+
+- **Against the model on its own.** The `closed_book` preset runs `llama3.1:8b` with no retrieval and asks it to name its legal basis. Its references are parsed and checked against the snapshot, so the report shows how often the bare model gets the tier wrong and how often it cites rules that don't exist (or the repealed 2007 Rules). The gap to the `full` column is what RAG adds.
+- **Against Walert.** The same measures Walert reported: % unanswered for out-of-knowledge-base questions, graded NDCG@1/3/5 for known and inferred questions, ROUGE-1 and BERTScore against written reference answers.
+- **Fairness.** 12 counterfactual variants change only a customer's name, country of birth, or which foreign country a PEP serves. The tier must not change (`fairness_tier_flip_rate_max: 0.0`).
+- **What the business cares about.** Under-application rate (the regulatory-exposure error), mandatory-ECDD recall, citation validity (can the answer be defended in an audit) and latency.
 
 ## Quick start
 
@@ -97,6 +107,7 @@ Review `kb/snapshot.lock.json` and the per-document chunk counts that `build` pr
 ```bash
 amlrag ask "A company's 45% shareholder is a serving member of a foreign parliament. Business account."
 amlrag ask --mode explain "What is the difference between source of wealth and source of funds?"
+amlrag ask --closed-book "…"   # the same question with no retrieval, for side-by-side demos
 amlrag serve                   # http://127.0.0.1:8000
 amlrag serve --fast            # uses generation.fallback_model
 ```
@@ -105,12 +116,18 @@ amlrag serve --fast            # uses generation.fallback_model
 
 ```bash
 amlrag eval                    # full pipeline over data/gold/scenarios.jsonl -> results/<timestamp>-full/
-amlrag eval --preset all       # ablation: baseline -> hybrid -> +facts -> +guardrails, plus comparison.md
+amlrag eval --preset all       # closed_book -> baseline -> hybrid -> +facts -> +guardrails, plus comparison.md
+amlrag eval --preset closed_book
+amlrag eval --tags fairness    # only the counterfactual groups (bases are kept automatically)
 amlrag eval --limit 5          # quick smoke run
 amlrag eval --judge lexical    # skip the LLM judge (faster, cruder faithfulness)
+
+pip install -e ".[walert]"     # optional: adds BERTScore (PyTorch + roberta-large, ~1.4 GB download on first run)
 ```
 
-Each run writes `predictions.jsonl`, `metrics.json`, `config_used.yaml` and a `report.md` with acceptance results, confusion matrix, per-customer-type accuracy, confidence calibration, consistency groups and every failure with its retrieved and cited sources. See [docs/evaluation.md](docs/evaluation.md).
+Each run writes `predictions.jsonl`, `metrics.json`, `config_used.yaml` and a `report.md` with acceptance results, confusion matrix, per-customer-type accuracy, confidence calibration, consistency groups, Walert-comparable measures, counterfactual fairness and every failure with its retrieved and cited sources. See [docs/evaluation.md](docs/evaluation.md).
+
+The full gold set is 74 items. On a laptop with `llama3.1:8b` and the LLM judge, budget roughly a minute per item per preset; `--preset all` runs five presets, so start it before a break or use `--judge lexical` while iterating.
 
 **4. Tests**
 
@@ -138,16 +155,16 @@ config.yaml                 runtime config + acceptance thresholds (env override
 kb/sources.yaml             source manifest (AUSTRAC pages, legislation, crawl scope)
 kb/snapshot.lock.json       what was fetched: URL, time, sha256  (created by `amlrag fetch`)
 kb/manual/                  hand-placed legislation PDFs
-data/gold/scenarios.jsonl   gold-standard test set (42 draft items)
+data/gold/scenarios.jsonl   gold-standard test set (74 draft items: 47 scenarios, 12 counterfactuals, 15 questions)
 src/amlrag/
   ingest/                   fetch.py, parse_html.py, parse_legislation.py, chunk.py, build.py
   index/store.py            Chroma build/query + index manifest
   retrieve/                 bm25.py, hybrid.py (RRF), facts.py (fact extraction + sub-queries)
-  generate/                 prompts.py, verify.py, guardrails.py
+  generate/                 prompts.py, verify.py, guardrails.py, references.py (closed-book reference parsing)
   backends/                 ollama.py (REST client), offline.py (test doubles)
   pipeline.py               Assistant.determine / Assistant.explain
-  querylog.py               SQLite log behind the Review gaps tab
-  eval/                     gold.py, metrics.py, judge.py, runner.py, report.py
+  querylog.py, redact.py    SQLite log behind the Review gaps tab; identifier masking
+  eval/                     gold.py, metrics.py, textmetrics.py (ROUGE-1, BERTScore), judge.py, runner.py, report.py
   server/                   FastAPI app + static UI (no build step)
 tests/                      offline tests; tests/acceptance = live gold-set thresholds
 docs/evaluation.md          metric definitions, calibration and review procedure
@@ -159,11 +176,13 @@ docs/evaluation.md          metric definitions, calibration and review procedure
 |---|---|---|
 | 1 | Knowledge base, chunking, nomic-embed-text + Chroma, Ollama llama3.1:8b, basic assistant | `amlrag fetch`, `amlrag build`, `amlrag ask` |
 | 2 | Gold set of ~35-40 scenarios; test retrieval, answers and citations; tune chunking and prompts; browser UI | `data/gold/`, `amlrag eval`, `config.yaml → chunking/retrieval`, `generate/prompts.py`, `amlrag serve` |
-| 3 | Effectiveness, faithfulness, attribution, consistency across customer types; final improvements; demo | `amlrag eval --preset all`, `report.md`, `comparison.md` |
+| 3 | Effectiveness, faithfulness, attribution, consistency across customer types; final improvements; demo | `amlrag eval --preset all`, `report.md`, `comparison.md` (with the closed-book baseline, Walert measures and fairness) |
+
+The ablation presets also map onto the brief's iterations: run `baseline` on the real snapshot first (the skateboard), then add `hybrid` and `hybrid_facts` (the scooter), then `full` with guardrails (the racing kart), recording each result on Trello as you go.
 
 ## Before you rely on the numbers
 
-1. **The gold set is a draft.** All 42 items are `status: draft`. The expected tiers were written from secondary summaries of Part 6 of the Rules and AUSTRAC's guidance structure, and several items are marked in `notes` as needing confirmation. Each item should be checked against the locked snapshot and set to `status: reviewed` with a `reviewer` (see [data/gold/README.md](data/gold/README.md)). Reports print how many items are still draft.
+1. **The gold set is a draft.** All 74 items are `status: draft`. The expected tiers and reference answers were written from secondary summaries of Part 6 of the Rules and AUSTRAC's guidance structure, and several items are marked in `notes` as needing confirmation. Each item should be checked against the locked snapshot and set to `status: reviewed` with a `reviewer` (see [data/gold/README.md](data/gold/README.md)). Reports print how many items are still draft.
 2. **The parsers were developed against synthetic fixtures**, because AUSTRAC and the Federal Register weren't reachable from the build environment. After the first real `fetch` + `build`, check chunk counts and a few sections with `amlrag stats --grep`. The HTML parser looks for `<main>`, then `role=main`, then `<article>`; if AUSTRAC's markup differs, adjust `_main_region` / `_DROP_SELECTORS` in `ingest/parse_html.py`.
 3. **Calibrate `retrieval.min_dense_similarity`** on your real index using the unanswerable items (procedure in `docs/evaluation.md`).
 4. **Section numbers.** Gold references use Rules 2025 numbering (`rules2025::6-23`). If the 2026 amendments renumbered anything in the compilation you lock, update the references.

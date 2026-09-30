@@ -6,6 +6,8 @@
 
 All metrics are in `results/<run>/metrics.json`; the headline set is also printed and written to `report.md`.
 
+Counterfactual variants (gold items with `counterfactual_of` set) are used **only** in the fairness block, so each scenario counts once everywhere else.
+
 ### Effectiveness (tier determination)
 
 Computed over answerable `determine` items.
@@ -59,6 +61,33 @@ Each cited reasoning point is checked against the text of the chunks it cites.
 
 Items sharing a `group` (paraphrases, or the same trigger across customer types) should get the same tier. `agreement_rate` is the share of groups whose members all agree; `all_correct_rate` requires them to also be correct.
 
+### Walert-comparable measures
+
+These follow Walert (Pathiyan Cherumanal et al., CHIIR 2024) so the results can be set beside the course's reference project. Walert grouped questions into *known* (a passage answers directly), *inferred* (answer needs several passages) and *out-of-KB* (in the domain but not answerable from the knowledge base); every gold item has an `answer_type` with those values, plus `underspecified` for scenarios that don't give enough facts to decide.
+
+| Metric | Definition |
+|---|---|
+| `pct_unanswered_out_of_kb` | Share of out-of-KB questions the assistant declined to answer. Walert's "% of unanswered out-of-knowledge-base questions"; higher is better. |
+| `pct_unanswered_underspecified` | The same for underspecified scenarios. |
+| `ndcg` `@1/@3/@5` | Graded NDCG with linear gain, split by known and inferred questions. `expected_sections` count as grade 2 (highly relevant, Walert's label 2) and `partial_sections` as grade 1 (partially relevant). A reference can be a whole document, so several chunks may match it; each reference is credited once, at the first chunk that matches it, and the ideal ranking places every reference once. Not applicable to closed-book. |
+| `rouge1` | ROUGE-1 precision, recall and F1 of the answer text (summary plus points) against the item's `reference_answer`. Same tokenisation as Google's `rouge-score` (verified identical); `eval.rouge_stemmer: true` adds Porter stemming. |
+| `bertscore` | BERTScore P/R/F1 against `reference_answer`, if `bert-score` is installed (`pip install -e ".[walert]"`). Model and rescaling are set under `eval.bertscore`; report which you used. |
+
+Our answers include reasoning points, so they are longer than the reference answers: ROUGE-1 precision will sit well below recall. Compare F1 across presets rather than against Walert's absolute numbers, which came from a different domain and answer style.
+
+### Counterfactual fairness
+
+Each variant copies a base scenario and changes one attribute that must not affect the tier: the customer's name, their country of birth, or which foreign country a PEP serves. Twelve variants over four base scenarios cover standard individuals, sole traders and foreign PEPs.
+
+| Metric | Definition |
+|---|---|
+| `invariance_rate` | Share of groups (base plus its variants) whose answers are all identical. |
+| `tier_flip_rate` | Share of variants whose tier differs from the base's. Acceptance limit 0.0: any flip is a finding to investigate. |
+| `confidence_flip_rate` | Share of variants whose reported confidence differs from the base's. A softer signal of sensitivity to the name. |
+| `variant_accuracy` | Share of variants with an acceptable tier. |
+
+The report lists every flip. If one appears, check the retrieved sources and extracted facts for that variant before concluding the model is biased: a flip can also come from retrieval pulling different passages for different names.
+
 ### Operations
 
 `latency_s` (mean, p50, p95 per item including fact extraction) and `needs_review_rate`. The p95 matters for the live demo.
@@ -78,14 +107,17 @@ Items sharing a `group` (paraphrases, or the same trigger across customer types)
 amlrag eval --preset all
 ```
 
-runs four configurations and writes `results/<stamp>-ablation/comparison.md`:
+runs five configurations and writes `results/<stamp>-ablation/comparison.md`:
 
 | Preset | Adds |
 |---|---|
+| `closed_book` | **No retrieval.** The model answers from its own training and names its legal basis for each point. This is the "is RAG worth it?" baseline. |
 | `baseline` | Dense retrieval only, no fact extraction, no guardrails. |
 | `hybrid` | + BM25 fused with RRF. |
 | `hybrid_facts` | + fact extraction and fact-driven sub-queries. |
 | `full` | + guardrails (the configuration in `config.yaml`). |
+
+For `closed_book`, the references the model names ("AML/CTF Rules 2025 s 6-23", "Act s 32") are parsed into section ids, so citation precision and recall work as usual. `citation_validity` means something different: the share of named sections that **exist** in the snapshot. References to the repealed 2007 Rules always count as invalid, and references to documents not in the snapshot (e.g. the Act if you didn't load it) are left out rather than counted as wrong. Retrieval, NDCG and faithfulness don't apply. `amlrag ask --closed-book "..."` shows the same thing for a single question, which is useful for a side-by-side in the demo video.
 
 The table shows which component moves which metric. The expected pattern is that hybrid retrieval lifts recall on rule-number and exact-term questions, fact extraction lifts mandatory-ECDD recall on multi-party scenarios (company and trust beneficial owners), and guardrails remove residual under-application at some cost to over-application. Report what you actually observe, including any component that didn't help.
 
