@@ -47,6 +47,7 @@ chunking:
   min_words: 20
 
 retrieval:
+  enabled: true                # false = closed-book baseline: the model answers with no sources (eval only)
   collection: austrac_cdd
   dense_k: 20
   bm25_k: 20

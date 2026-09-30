@@ -20,15 +20,18 @@ from amlrag.pipeline import Assistant
 
 log = logging.getLogger(__name__)
 
-# Ablations for the final report: each switches on one more component.
+# Ablations for the final report. closed_book is the no-RAG baseline (the model on its
+# own); each later preset switches on one more component.
 PRESETS: dict[str, dict[str, Any]] = {
-    "baseline": {"retrieval.use_hybrid": False, "retrieval.use_fact_extraction": False,
+    "closed_book": {"retrieval.enabled": False, "retrieval.use_fact_extraction": False,
+                    "verification.guardrails": False},
+    "baseline": {"retrieval.enabled": True, "retrieval.use_hybrid": False, "retrieval.use_fact_extraction": False,
                  "verification.guardrails": False},
-    "hybrid": {"retrieval.use_hybrid": True, "retrieval.use_fact_extraction": False,
+    "hybrid": {"retrieval.enabled": True, "retrieval.use_hybrid": True, "retrieval.use_fact_extraction": False,
                "verification.guardrails": False},
-    "hybrid_facts": {"retrieval.use_hybrid": True, "retrieval.use_fact_extraction": True,
+    "hybrid_facts": {"retrieval.enabled": True, "retrieval.use_hybrid": True, "retrieval.use_fact_extraction": True,
                      "verification.guardrails": False},
-    "full": {},
+    "full": {"retrieval.enabled": True},
 }
 
 
@@ -41,13 +44,16 @@ def apply_preset(cfg: Config, preset: str) -> Config:
 
 
 def _prediction(item: GoldItem, result: dict[str, Any], judge: Judge | None, chunk_text: dict[str, str]) -> dict:
+    closed = bool(result.get("closed_book"))
     points = []
     for pt in result.get("points", []):
-        cids = [c["chunk_id"] for c in pt.get("citations", [])]
-        verdict = judge.supported(pt["text"], [chunk_text[c] for c in cids if c in chunk_text]) if judge else None
+        cids = [c["chunk_id"] for c in pt.get("citations", []) if c.get("chunk_id")]
+        # Closed-book points have no passages to check against, so faithfulness is not applicable.
+        verdict = None if (closed or not judge) else judge.supported(
+            pt["text"], [chunk_text[c] for c in cids if c in chunk_text])
         points.append({"text": pt["text"], "group": pt.get("group"), "chunk_ids": cids,
-                       "support": pt.get("support"), "supported_lexical": pt.get("supported"),
-                       "judge_supported": verdict})
+                       "reference": pt.get("reference"), "support": pt.get("support"),
+                       "supported_lexical": None if closed else pt.get("supported"), "judge_supported": verdict})
     cited = []
     for pt in points:
         for c in pt["chunk_ids"]:
@@ -62,6 +68,7 @@ def _prediction(item: GoldItem, result: dict[str, Any], judge: Judge | None, chu
         "answer_text": answer_text, "summary": result.get("summary"), "facts": result.get("facts"),
         "guardrails_fired": result.get("guardrails_fired", []), "escalated": result.get("escalated", False),
         "checks": result.get("checks", {}), "latency_s": result.get("timings", {}).get("total_s"),
+        "closed_book": closed,
         "judge_name": judge.name if judge else "lexical",
     }
 

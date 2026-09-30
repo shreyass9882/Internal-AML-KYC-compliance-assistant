@@ -27,6 +27,11 @@ def write_report(path: Path, items: list[GoldItem], preds: dict[str, dict], m: d
     L.append(f"- Gold file: `{run.get('gold_file')}`: {run.get('n_items')} items "
              f"({run.get('gold_status', {}).get('reviewed', 0)} reviewed, {run.get('gold_status', {}).get('draft', 0)} draft)")
     L.append(f"- Duration: {run.get('duration_s')} s; finished {run.get('finished')}\n")
+    if run.get("preset") == "closed_book":
+        L.append("> **Closed-book baseline.** The model answered from its own training with no retrieved sources. "
+                 "Retrieval and faithfulness metrics do not apply. Citation validity here means the legal references "
+                 "the model named exist in the snapshot; references to documents not in the snapshot are excluded. "
+                 "Acceptance thresholds are shown for comparison only.\n")
     if run.get("gold_status", {}).get("draft"):
         L.append("> Draft gold items have not yet been checked against the locked snapshot by a reviewer. "
                  "Treat these numbers as provisional.\n")
@@ -90,11 +95,14 @@ def write_report(path: Path, items: list[GoldItem], preds: dict[str, dict], m: d
         L.append(f"- expected sections: {', '.join(g.expected_sections) or '-'}")
         L.append(f"- retrieved: {', '.join(p.get('retrieved', [])[:8]) or '-'}")
         L.append(f"- cited: {', '.join(p.get('cited', [])) or '-'}")
+        refs = [pt.get("reference") for pt in p.get("points", []) if pt.get("reference")]
+        if refs:
+            L.append(f"- references named by the model: {'; '.join(dict.fromkeys(refs))}")
         if g.notes:
             L.append(f"- gold note: {g.notes}")
         L.append("")
 
-    weak = [(pid, pt) for pid, p in preds.items() for pt in p.get("points", [])
+    weak = [(pid, pt) for pid, p in preds.items() if not p.get("closed_book") for pt in p.get("points", [])
             if pt.get("judge_supported") is False or (pt.get("judge_supported") is None and not pt.get("supported_lexical"))]
     L.append(f"\n## Unsupported claims ({len(weak)})\n")
     for pid, pt in weak[:25]:

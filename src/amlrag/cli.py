@@ -17,6 +17,8 @@ def _cfg(args):
                  .override("eval.judge_backend", "lexical")
     if getattr(args, "fast", False):
         cfg = cfg.override("generation.model", cfg.generation.fallback_model)
+    if getattr(args, "closed_book", False):
+        cfg = cfg.override("retrieval.enabled", False)
     return cfg
 
 
@@ -75,6 +77,11 @@ def _print_result(r: dict) -> None:
               + ("   [NEEDS REVIEW]" if r["needs_review"] else ""))
     print("\n" + w.fill(r["summary"] or ""))
     for p in r["points"]:
+        if r.get("closed_book"):
+            marks = {True: "exists", False: "NOT IN SNAPSHOT", None: "not checked"}
+            refs = ", ".join(f"{c['label']} ({marks[c.get('exists')]})" for c in p["citations"])
+            print(w.fill(f"  - {p['text']} [reference: {p.get('reference') or 'none'}{'; ' + refs if refs else ''}]"))
+            continue
         labels = ", ".join(c["label"] for c in p["citations"]) or "no valid citation"
         flag = "" if p["supported"] else "  (weak support)"
         print(w.fill(f"  - {p['text']} [{labels}]{flag}"))
@@ -159,7 +166,8 @@ def cmd_doctor(args) -> int:
         except Exception as exc:
             print(f"[!!] {exc}")
             ok = False
-    print(f"[..] generation num_ctx={cfg.generation.num_ctx}, final_k={cfg.retrieval.final_k}, "
+    print(f"[..] retrieval enabled={cfg.retrieval.get('enabled', True)}, "
+          f"generation num_ctx={cfg.generation.num_ctx}, final_k={cfg.retrieval.final_k}, "
           f"hybrid={cfg.retrieval.use_hybrid}, facts={cfg.retrieval.use_fact_extraction}, "
           f"guardrails={cfg.verification.guardrails}/{cfg.verification.guardrail_mode}")
     return 0 if ok else 1
@@ -221,10 +229,13 @@ def main(argv: list[str] | None = None) -> None:
     sp.add_argument("--mode", choices=["determine", "explain"], default="determine")
     sp.add_argument("--json", action="store_true")
     sp.add_argument("--fast", action="store_true", help="use generation.fallback_model")
+    sp.add_argument("--closed-book", action="store_true",
+                    help="answer with no retrieval (the baseline RAG is compared against)")
 
     sp = add("eval", cmd_eval, "run the gold-standard evaluation")
     sp.add_argument("--gold", help="gold JSONL (default paths.gold_file)")
-    sp.add_argument("--preset", default="full", help="full | baseline | hybrid | hybrid_facts | no_guardrails | all")
+    sp.add_argument("--preset", default="full",
+                    help="full | closed_book | baseline | hybrid | hybrid_facts | all (runs every preset)")
     sp.add_argument("--limit", type=int)
     sp.add_argument("--ids", nargs="+")
     sp.add_argument("--judge", choices=["ollama", "lexical"])

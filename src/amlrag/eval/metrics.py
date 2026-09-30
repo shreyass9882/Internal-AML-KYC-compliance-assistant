@@ -98,12 +98,13 @@ def compute_metrics(items: list[GoldItem], preds: dict[str, dict[str, Any]], ava
         if not refs:
             unreachable.append(g.id)
             continue
-        retrieved = p.get("retrieved", [])[:k]
-        found = [r for r in refs if any(ref_matches(cid, r) for cid in retrieved)]
-        recall.append(len(found) / len(refs))
-        hit.append(float(bool(found)))
-        first = next((i for i, cid in enumerate(retrieved, 1) if any(ref_matches(cid, r) for r in refs)), None)
-        rr.append(1.0 / first if first else 0.0)
+        if not p.get("closed_book"):          # the closed-book baseline retrieves nothing
+            retrieved = p.get("retrieved", [])[:k]
+            found = [r for r in refs if any(ref_matches(cid, r) for cid in retrieved)]
+            recall.append(len(found) / len(refs))
+            hit.append(float(bool(found)))
+            first = next((i for i, cid in enumerate(retrieved, 1) if any(ref_matches(cid, r) for r in refs)), None)
+            rr.append(1.0 / first if first else 0.0)
         cited = p.get("cited", [])
         if cited and not p.get("abstained"):
             c_prec.append(sum(any(ref_matches(c, r) for r in refs) for c in cited) / len(cited))
@@ -113,8 +114,8 @@ def compute_metrics(items: list[GoldItem], preds: dict[str, dict[str, Any]], ava
     m["retrieval"] = {"n": len(recall), f"recall_at_{k}": _mean(recall), f"hit_at_{k}": _mean(hit),
                       "mrr": _mean(rr), "items_without_reachable_refs": unreachable}
     m["attribution"] = {
-        "citation_validity": _mean([p.get("checks", {}).get("citation_validity", 1.0) for _, p in pairs
-                                    if p.get("checks")]),
+        "citation_validity": _mean([p["checks"]["citation_validity"] for _, p in pairs
+                                    if p.get("checks", {}).get("citation_validity") is not None]),
         "citation_precision_section": _mean(c_prec),
         "citation_precision_document": _mean(c_prec_doc),
         "citation_recall_section": _mean(c_rec),
@@ -127,7 +128,8 @@ def compute_metrics(items: list[GoldItem], preds: dict[str, dict[str, Any]], ava
         if p.get("abstained"):
             continue
         for pt in p.get("points", []):
-            lexical.append(float(bool(pt.get("supported_lexical"))))
+            if pt.get("supported_lexical") is not None:
+                lexical.append(float(bool(pt["supported_lexical"])))
             if pt.get("judge_supported") is not None:
                 judged.append(float(bool(pt["judge_supported"])))
     m["faithfulness"] = {

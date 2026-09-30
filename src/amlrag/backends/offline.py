@@ -94,6 +94,17 @@ def _stub_facts(scenario: str) -> dict[str, Any]:
     }
 
 
+def _stub_tier(f: dict[str, Any]) -> str:
+    if (f["pep_status"] == "foreign" or f["high_risk_jurisdiction"] or f["suspicious_matter_continuing"]
+            or f["nested_services"] or f["unusual_transaction"] or f["ml_tf_risk"] == "high"):
+        return "enhanced"
+    if f["regulated_or_government"] and f["ml_tf_risk"] != "high":
+        return "simplified"
+    if f["missing_information"]:
+        return "insufficient_information"
+    return "standard"
+
+
 class StubLLM:
     name = "stub"
 
@@ -107,6 +118,21 @@ class StubLLM:
 
         sources = _sources_from_prompt(user)
         query = user.split("SCENARIO:", 1)[-1].split("QUESTION:", 1)[-1].split("SOURCES:", 1)[0]
+
+        if task == "closed_determine":
+            f = _stub_facts(query)
+            tier = _stub_tier(f)
+            ref = {"enhanced": "AML/CTF Rules 2025 s 6-23" if f["pep_status"] == "foreign" else "AML/CTF Act s 32",
+                   "simplified": "AML/CTF Rules 2025 s 6-18", "standard": "AML/CTF Act s 28"}.get(tier, "none")
+            return {"tier": tier, "summary": f"Offline stub closed-book determination: {tier.replace('_', ' ')}.",
+                    "reasoning": [{"point": "Offline stub closed-book reasoning.", "reference": ref}],
+                    "required_measures": [{"measure": "Collect and verify KYC information.", "reference": "none"}],
+                    "missing_information": f["missing_information"], "confidence": "high"}, stats
+        if task == "closed_explain":
+            return {"answerable": True, "summary": "Offline stub closed-book answer.",
+                    "key_points": [{"point": "Offline stub closed-book point.",
+                                    "reference": "AML/CTF Rules 2007 Chapter 4"}],
+                    "missing_information": [], "confidence": "high"}, stats
 
         if task == "judge":
             claim = user.split("CLAIM:", 1)[-1].split("PASSAGES:", 1)[0]
@@ -135,15 +161,7 @@ class StubLLM:
             }, stats
 
         f = _stub_facts(query)
-        if (f["pep_status"] == "foreign" or f["high_risk_jurisdiction"] or f["suspicious_matter_continuing"]
-                or f["nested_services"] or f["unusual_transaction"] or f["ml_tf_risk"] == "high"):
-            tier = "enhanced"
-        elif f["regulated_or_government"] and f["ml_tf_risk"] != "high":
-            tier = "simplified"
-        elif f["missing_information"]:
-            tier = "insufficient_information"
-        else:
-            tier = "standard"
+        tier = _stub_tier(f)
         point_text = _body(dict(sources)[cited[0]])[:220]
         return {
             "tier": tier,

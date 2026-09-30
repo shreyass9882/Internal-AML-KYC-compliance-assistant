@@ -9,7 +9,17 @@ from amlrag import ABSTAIN
 from amlrag.backends import make_embedder, make_llm
 from amlrag.config import Config
 from amlrag.generate.guardrails import apply_guardrails
-from amlrag.generate.prompts import DETERMINE_SCHEMA, EXPLAIN_SCHEMA, determine_messages, explain_messages
+from amlrag.generate.prompts import (
+    CLOSED_DETERMINE_SCHEMA,
+    CLOSED_EXPLAIN_SCHEMA,
+    DETERMINE_SCHEMA,
+    EXPLAIN_SCHEMA,
+    closed_determine_messages,
+    closed_explain_messages,
+    determine_messages,
+    explain_messages,
+)
+from amlrag.generate.references import check_reference, parse_references
 from amlrag.generate.verify import cap_confidence, verify
 from amlrag.index.store import VectorStore
 from amlrag.ingest.build import read_chunks
@@ -29,6 +39,9 @@ FLAG_MODEL_ERROR = "The language model failed to respond"
 FLAG_NO_CITATION = "Answer withheld: no valid citation"
 FLAG_MODEL_ABSTAINED = "The model could not answer from the sources"
 FLAG_ESCALATED = "Tier escalated by guardrail"
+FLAG_CLOSED_BOOK = "Closed-book baseline: no sources retrieved"
+CLOSED_BOOK_WARNING = ("Closed-book baseline: this answer comes from the model's own training with no retrieved "
+                       "sources. Its references were checked only for whether the section exists in the snapshot.")
 EXPLAIN_GROUPS = {"key_points": "point"}
 
 
@@ -52,6 +65,10 @@ class Assistant:
     @property
     def offline_stub(self) -> bool:
         return getattr(self.llm, "name", "") == "stub"
+
+    @property
+    def closed_book(self) -> bool:
+        return not self.cfg.retrieval.get("enabled", True)
 
     # ------------------------------------------------------------------ helpers
     def _sources(self, results: list[Retrieved], cited: list[str]) -> list[dict[str, Any]]:
@@ -81,6 +98,8 @@ class Assistant:
 
     # -------------------------------------------------------------------- modes
     def determine(self, scenario: str) -> dict[str, Any]:
+        if self.closed_book:
+            return self._closed_book("determine", scenario)
         t_start = time.perf_counter()
         timings: dict[str, float] = {}
         facts = None
@@ -157,6 +176,8 @@ class Assistant:
         }
 
     def explain(self, question: str) -> dict[str, Any]:
+        if self.closed_book:
+            return self._closed_book("explain", question)
         t_start = time.perf_counter()
         timings: dict[str, float] = {}
         results, t_ret = self._retrieve(question, None)
@@ -200,6 +221,75 @@ class Assistant:
                        "max_similarity": round(max_sim, 4)},
             "timings": timings, "llm_stats": stats,
             "models": {"embedder": self.embedder_name, "generator": getattr(self.llm, "name", "?")},
+            "snapshot": self.snapshot, "offline_stub": self.offline_stub,
+        }
+
+    # ------------------------------------------------------------ closed-book baseline
+    def _snapshot_sections(self) -> tuple[set[str], set[str]]:
+        if not hasattr(self, "_sections_cache"):
+            chunks = self.retriever.chunks.values()
+            self._sections_cache = ({c.section_ref for c in chunks}, {c.doc_id for c in chunks})
+        return self._sections_cache
+
+    def _closed_book(self, mode: str, text: str) -> dict[str, Any]:
+        """Answer with no retrieval: the model's own knowledge, references parsed and existence-checked."""
+        t_start = time.perf_counter()
+        if mode == "determine":
+            messages, schema, groups = closed_determine_messages(text), CLOSED_DETERMINE_SCHEMA, DETERMINE_GROUPS
+        else:
+            messages, schema, groups = closed_explain_messages(text), CLOSED_EXPLAIN_SCHEMA, EXPLAIN_GROUPS
+        try:
+            out, stats = self.llm.chat_json(messages, schema, task=f"closed_{mode}")
+        except Exception as exc:
+            log.exception("generation failed")
+            res = self._abstain(mode, text, f"The language model failed to answer ({exc}).", [], None,
+                                {"total_s": round(time.perf_counter() - t_start, 3)}, FLAG_MODEL_ERROR)
+            return {**res, "closed_book": True}
+        known, docs = self._snapshot_sections()
+        points: list[dict[str, Any]] = []
+        verifiable = valid = uncited = 0
+        for key, field in groups.items():
+            for item in out.get(key) or []:
+                if not isinstance(item, dict) or not str(item.get(field, "")).strip():
+                    continue
+                ref_text = str(item.get("reference", "")).strip()
+                refs = parse_references(ref_text)
+                citations, invalid = [], []
+                for ref in refs:
+                    exists = check_reference(ref, known, docs)
+                    if exists is not None:
+                        verifiable += 1
+                        valid += int(exists)
+                    if exists is False:
+                        invalid.append(ref)
+                    citations.append({"label": ref, "chunk_id": ref, "citation": ref_text, "url": None,
+                                      "exists": exists})
+                uncited += int(not refs)
+                points.append({"group": key, "text": str(item[field]).strip(), "reference": ref_text,
+                               "citations": citations, "invalid_labels": invalid, "support": None,
+                               "supported": None})
+        if mode == "determine":
+            tier = out.get("tier") if out.get("tier") in DETERMINE_SCHEMA["properties"]["tier"]["enum"] else ABSTAIN
+            abstained = tier == ABSTAIN
+        else:
+            tier = None
+            abstained = not bool(out.get("answerable", True)) or not points
+        confidence = out.get("confidence") if out.get("confidence") in ("high", "medium", "low") else "low"
+        return {
+            "mode": mode, "query": text, "tier": tier, "model_tier": tier,
+            "summary": str(out.get("summary", "")).strip(),
+            "points": [] if (abstained and mode == "explain") else points,
+            "missing_information": [str(m) for m in out.get("missing_information", [])],
+            "confidence": "low" if abstained else confidence, "abstained": abstained,
+            "abstain_reason": (out.get("summary") or "The model could not answer.") if abstained else None,
+            "flag_reason": FLAG_CLOSED_BOOK, "needs_review": True, "warnings": [CLOSED_BOOK_WARNING],
+            "facts": None, "guardrails_fired": [], "escalated": False, "sources": [], "closed_book": True,
+            "checks": {"citation_validity": round(valid / verifiable, 3) if verifiable else None,
+                       "references": sum(len(p["citations"]) for p in points), "verifiable_references": verifiable,
+                       "points": len(points), "uncited_points": uncited, "unsupported_points": None},
+            "timings": {"generation_s": stats.get("latency_s"), "total_s": round(time.perf_counter() - t_start, 3)},
+            "llm_stats": stats,
+            "models": {"embedder": None, "generator": getattr(self.llm, "name", "?")},
             "snapshot": self.snapshot, "offline_stub": self.offline_stub,
         }
 
