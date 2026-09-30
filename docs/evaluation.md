@@ -47,7 +47,7 @@ Over answerable items whose expected documents are indexed (items that reference
 
 Each cited reasoning point is checked against the text of the chunks it cites.
 
-- `judge_supported_rate`: an LLM judge (`eval.judge_model`) decides whether the passages fully support the claim. Verdicts are cached in `results/.judge_cache.json`. Using the same model as the generator inflates this score; if the machine can hold a second model, set `judge_model` to a different family (e.g. `qwen2.5:7b`) and say which one you used in the report.
+- `judge_supported_rate`: an LLM judge (`eval.judge_model`) decides whether the passages fully support the claim. Verdicts are cached in `results/.judge_cache.json`. Using the same model as the generator inflates this score, so the judge (`llama3.1:8b`) is from a different family than the answer model (`qwen3.5:9b`). If you evaluate `--model llama3.1:8b`, change the judge for that run. Say which judge you used in the report.
 - `lexical_supported_rate`: share of points whose content words mostly appear in the cited text (threshold `verification.min_support_overlap`). Crude, but free and deterministic; use it for quick iteration and the judge for reported numbers.
 
 ### Abstention
@@ -120,6 +120,18 @@ runs five configurations and writes `results/<stamp>-ablation/comparison.md`:
 For `closed_book`, the references the model names ("AML/CTF Rules 2025 s 6-23", "Act s 32") are parsed into section ids, so citation precision and recall work as usual. `citation_validity` means something different: the share of named sections that **exist** in the snapshot. References to the repealed 2007 Rules always count as invalid, and references to documents not in the snapshot (e.g. the Act if you didn't load it) are left out rather than counted as wrong. Retrieval, NDCG and faithfulness don't apply. `amlrag ask --closed-book "..."` shows the same thing for a single question, which is useful for a side-by-side in the demo video.
 
 The table shows which component moves which metric. The expected pattern is that hybrid retrieval lifts recall on rule-number and exact-term questions, fact extraction lifts mandatory-ECDD recall on multi-party scenarios (company and trust beneficial owners), and guardrails remove residual under-application at some cost to over-application. Report what you actually observe, including any component that didn't help.
+
+## Comparing answer models
+
+Run the same preset with each model on the same index and gold set, then put the runs side by side:
+
+```bash
+amlrag eval --preset full --model llama3.1:8b --judge lexical
+amlrag eval --preset full --judge lexical          # qwen3.5:9b
+amlrag compare results/<first run> results/<second run>
+```
+
+Use the same judge for every run you compare. `--judge lexical` is the simplest way to guarantee that; for final numbers use an LLM judge that is a different family from both answer models.
 
 ## Reviewing gold items
 

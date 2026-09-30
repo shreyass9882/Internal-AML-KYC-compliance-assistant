@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -74,6 +75,12 @@ def _prediction(item: GoldItem, result: dict[str, Any], judge: Judge | None, chu
     }
 
 
+def model_slug(cfg: Config) -> str:
+    """Short, filesystem-safe name of the answer model, used in results folder names."""
+    name = "stub" if cfg.generation.backend == "stub" else str(cfg.generation.model)
+    return re.sub(r"[^A-Za-z0-9.]+", "-", name).strip("-")
+
+
 def _select(items: list[GoldItem], ids, tags, limit) -> list[GoldItem]:
     if ids:
         items = [i for i in items if i.id in ids]
@@ -123,10 +130,14 @@ def run_eval(cfg: Config, preset: str = "full", gold_path: str | None = None, li
     available_docs = {c.doc_id for c in assistant.retriever.chunks.values()}
 
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    out_dir = out_dir or cfg.path("results_dir") / f"{stamp}-{preset}"
+    out_dir = out_dir or cfg.path("results_dir") / f"{stamp}-{preset}-{model_slug(cfg)}"
     out_dir.mkdir(parents=True, exist_ok=True)
     judge_llm = make_judge(cfg)
     judge = Judge(judge_llm, cfg.path("results_dir") / ".judge_cache.json") if judge_llm else None
+    self_graded = bool(judge and judge.name == getattr(assistant.llm, "name", None))
+    if self_graded and verbose:
+        print(f"WARNING: {judge.name} is both the answer model and the judge; faithfulness will be inflated. "
+              "Use --judge lexical or set eval.judge_model to a different model family.")
 
     preds: dict[str, dict[str, Any]] = {}
     t0 = time.perf_counter()
@@ -164,7 +175,8 @@ def run_eval(cfg: Config, preset: str = "full", gold_path: str | None = None, li
         "preset": preset, "started": stamp, "duration_s": round(time.perf_counter() - t0, 1),
         "gold_file": str(gold_path or cfg.path("gold_file")), "n_items": len(items),
         "generator": getattr(assistant.llm, "name", "?"), "embedder": assistant.embedder_name,
-        "judge": judge.name if judge else "lexical", "snapshot": assistant.snapshot, "bertscore": bert_info,
+        "judge": judge.name if judge else "lexical", "judge_same_as_generator": self_graded,
+        "snapshot": assistant.snapshot, "bertscore": bert_info,
         "index_digest": assistant.retriever.store.manifest.get("chunks_digest"),
         "gold_status": {s: sum(i.status == s for i in items) for s in ("draft", "reviewed")},
         "finished": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -172,7 +184,7 @@ def run_eval(cfg: Config, preset: str = "full", gold_path: str | None = None, li
     (out_dir / "metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
     (out_dir / "config_used.yaml").write_text(yaml.safe_dump(cfg.to_dict(), sort_keys=False), encoding="utf-8")
     write_report(out_dir / "report.md", items, preds, metrics)
-    latest = cfg.path("results_dir") / f"latest-{preset}.json"
+    latest = cfg.path("results_dir") / f"latest-{preset}-{model_slug(cfg)}.json"
     latest.write_text(json.dumps({"dir": str(out_dir), "headline": metrics["headline"]}, indent=2),
                       encoding="utf-8")
     return out_dir, metrics
@@ -188,7 +200,7 @@ def _item_ok(item: GoldItem, pred: dict[str, Any]) -> bool:
 
 def run_all_presets(cfg: Config, **kwargs) -> Path:
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    base = cfg.path("results_dir") / f"{stamp}-ablation"
+    base = cfg.path("results_dir") / f"{stamp}-ablation-{model_slug(cfg)}"
     results = {}
     for preset in PRESETS:
         print(f"\n=== preset: {preset} ===")

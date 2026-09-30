@@ -1,6 +1,7 @@
 """Markdown reports: one per run, plus an ablation comparison table."""
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +28,9 @@ def write_report(path: Path, items: list[GoldItem], preds: dict[str, dict], m: d
     L.append(f"- Gold file: `{run.get('gold_file')}`: {run.get('n_items')} items "
              f"({run.get('gold_status', {}).get('reviewed', 0)} reviewed, {run.get('gold_status', {}).get('draft', 0)} draft)")
     L.append(f"- Duration: {run.get('duration_s')} s; finished {run.get('finished')}\n")
+    if run.get("judge_same_as_generator"):
+        L.append("> **The judge is the same model that wrote the answers**, so the faithfulness score is likely "
+                 "inflated. Re-run with a judge from a different model family before reporting it.\n")
     if run.get("preset") == "closed_book":
         L.append("> **Closed-book baseline.** The model answered from its own training with no retrieved sources. "
                  "Retrieval and faithfulness metrics do not apply. Citation validity here means the legal references "
@@ -156,15 +160,45 @@ def write_report(path: Path, items: list[GoldItem], preds: dict[str, dict], m: d
     path.write_text("\n".join(L) + "\n", encoding="utf-8")
 
 
-def write_comparison(path: Path, results: dict[str, dict[str, Any]]) -> None:
-    presets = list(results)
+ABLATION_INTRO = ("closed_book is the model on its own, with no retrieval: the gap between it and the other columns "
+                  "is what RAG adds. Each later preset adds one component: baseline (dense retrieval) → hybrid (+BM25) "
+                  "→ hybrid_facts (+fact extraction sub-queries) → full (+guardrails). For closed_book, retrieval and "
+                  "faithfulness do not apply, and citation validity means the named section exists.")
+
+
+def write_comparison(path: Path, results: dict[str, dict[str, Any]], title: str = "Ablation comparison",
+                     intro: str = ABLATION_INTRO, notes: list[str] | None = None) -> None:
+    labels = list(results)
     keys = list(next(iter(results.values()))["headline"].keys())
-    L = ["# Ablation comparison\n", "closed_book is the model on its own, with no retrieval: the gap between it "
-         "and the other columns is what RAG adds. Each later preset adds one component: baseline (dense retrieval) → "
-         "hybrid (+BM25) → hybrid_facts (+fact extraction sub-queries) → full (+guardrails). For closed_book, "
-         "retrieval and faithfulness do not apply, and citation validity means the named section exists.\n",
-         "| Metric | " + " | ".join(presets) + " |", "|---|" + "---|" * len(presets)]
+    L = [f"# {title}\n", intro + "\n", "| Metric | " + " | ".join(labels) + " |", "|---|" + "---|" * len(labels)]
     for k in keys:
-        L.append(f"| {k} | " + " | ".join(_fmt(results[p]["headline"].get(k)) for p in presets) + " |")
+        L.append(f"| {k} | " + " | ".join(_fmt(results[p]["headline"].get(k)) for p in labels) + " |")
+    if notes:
+        L.append("")
+        L += [f"- {n}" for n in notes]
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(L) + "\n", encoding="utf-8")
+
+
+def compare_runs(run_dirs: list[Path], out_path: Path) -> str:
+    """Side-by-side table of any finished runs (e.g. the same preset with two different models)."""
+    results: dict[str, dict[str, Any]] = {}
+    notes = []
+    for d in run_dirs:
+        m = json.loads((Path(d) / "metrics.json").read_text(encoding="utf-8"))
+        run = m.get("run", {})
+        label = f"{run.get('preset', '?')} · {str(run.get('generator', '?')).replace('ollama:', '')}"
+        while label in results:
+            label += "'"
+        results[label] = m
+        notes.append(f"{label}: {Path(d).name}, {run.get('n_items')} items, judge {run.get('judge')}, "
+                     f"snapshot {run.get('snapshot')}, index {run.get('index_digest')}")
+    digests = {r.get("run", {}).get("index_digest") for r in results.values()}
+    ns = {r.get("run", {}).get("n_items") for r in results.values()}
+    if len(digests) > 1 or len(ns) > 1:
+        notes.insert(0, "**Warning:** these runs used different indexes or numbers of items, so they are not "
+                        "directly comparable.")
+    write_comparison(out_path, results, "Run comparison",
+                     "Each column is one evaluation run. Only compare runs made on the same index and gold set.",
+                     notes)
+    return out_path.read_text(encoding="utf-8")

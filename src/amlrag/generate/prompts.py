@@ -1,6 +1,6 @@
 """Prompts and JSON schemas for the two answer modes.
 
-Kept short on purpose: llama3.1:8b follows a compact, rule-numbered prompt
+Kept short on purpose: 8-9B local models follow a compact, rule-numbered prompt
 more reliably than a long one, and every token here competes with the sources
 for the context window.
 """

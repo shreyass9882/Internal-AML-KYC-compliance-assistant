@@ -1,7 +1,7 @@
 # AML/CTF CDD Compliance Assistant: runtime configuration.
 # Any value can be overridden with an environment variable, e.g.
 #   AMLRAG_OLLAMA__HOST=http://10.0.0.5:11434
-#   AMLRAG_GENERATION__MODEL=llama3.2:3b
+#   AMLRAG_GENERATION__MODEL=llama3.1:8b   (or: amlrag eval --model llama3.1:8b)
 # (double underscore separates nesting levels)
 
 paths:
@@ -32,8 +32,11 @@ embedding:
 
 generation:
   backend: ollama              # ollama | stub  (stub = offline UI/dev only, NOT real answers)
-  model: llama3.1:8b
-  fallback_model: llama3.2:3b  # used by `--fast` / if latency is a problem in the live demo
+  model: qwen3.5:9b            # Milestone 1 baseline was llama3.1:8b; compare with `amlrag eval --model llama3.1:8b`
+  fallback_model: qwen3.5:4b   # used by `--fast` / if latency is a problem in the live demo
+  # Qwen 3.5 and Gemma 4 "think" before answering by default: much slower, and the reasoning can
+  # spill into the JSON. false turns it off; models that can't think (llama3.1) ignore it.
+  think: false
   temperature: 0.0
   seed: 42
   # Ollama's default context window is small (2k-4k depending on version) and
@@ -84,7 +87,8 @@ query_log:
 
 eval:
   judge_backend: ollama        # ollama | lexical
-  judge_model: llama3.1:8b     # ideally a *different* model family (e.g. qwen2.5:7b) to reduce self-grading bias
+  judge_model: llama3.1:8b     # a different model family from the answer model, so answers aren't self-graded
+  judge_think: false
   # Walert-comparable measures (Pathiyan Cherumanal et al., CHIIR 2024)
   ndcg_cutoffs: [1, 3, 5]
   rouge_stemmer: false         # true = Porter stemming as rouge-score's use_stemmer=True (needs nltk)

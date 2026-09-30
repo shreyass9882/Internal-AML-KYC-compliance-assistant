@@ -2,7 +2,7 @@
 
 **WIL Project, Group 94 (RMIT).** A Test-Driven RAG assistant that helps AML/CTF compliance officers determine the correct customer due diligence (CDD) tier for a customer scenario, with every determination cited to the specific AUSTRAC guidance section or AML/CTF Rules 2025 clause it relies on.
 
-Everything runs locally: **Ollama** (`llama3.1:8b` for generation, `nomic-embed-text` for embeddings) and **Chroma** as the vector store. No customer data leaves the machine.
+Everything runs locally: **Ollama** (`qwen3.5:9b` writes the answers, `nomic-embed-text` searches, `llama3.1:8b` grades answers during evaluation) and **Chroma** as the vector store. No customer data leaves the machine.
 
 > Decision support only. Determinations must be confirmed by a compliance officer against the reporting entity's AML/CTF program.
 
@@ -29,7 +29,7 @@ flowchart LR
     D --> F[(BM25)]
   end
   subgraph Answer ["amlrag ask / serve"]
-    Q[Scenario] --> X[Fact extraction<br/>llama3.1:8b, JSON schema]
+    Q[Scenario] --> X[Fact extraction<br/>qwen3.5:9b, JSON schema]
     X --> S[Fact-driven sub-queries]
     Q --> R[Hybrid retrieval<br/>dense + BM25, RRF]
     S --> R
@@ -51,7 +51,7 @@ Key design choices (each is switchable in `config.yaml`, and the evaluation abla
 - **nomic-embed-text task prefixes** (`search_document:` / `search_query:`). Leaving them out noticeably hurts retrieval.
 - **Hybrid retrieval.** Legal text rewards exact terms ("source of wealth", "6-18"); BM25 catches those, dense retrieval catches paraphrase. Fused with reciprocal rank fusion.
 - **Fact extraction.** An 8B model reading a long scenario can miss the one decisive fact. The model first extracts a fixed set of CDD facts (PEP status, jurisdiction, SMR, risk rating…); each positive fact becomes a targeted sub-query, and the facts feed the guardrails.
-- **Structured output.** Ollama JSON-schema constrained generation, `temperature 0`, fixed seed, `num_ctx 8192`. Ollama's default context window silently truncates prompts with 8 sources.
+- **Structured output.** Ollama JSON-schema constrained generation, `temperature 0`, fixed seed, `num_ctx 8192`. Ollama's default context window silently truncates prompts with 8 sources. Qwen 3.5's "thinking" phase is switched off (`generation.think: false`): it is slow and its reasoning can leak into the JSON.
 - **Verification.** Model citations are mapped back to retrieved chunks; labels that weren't retrieved are removed; each point's lexical support in its cited text is scored; confidence can only go down from what the model claims.
 - **Guardrails.** Under-applying CDD is the costly error. If the scenario contains a mandatory ECDD trigger (foreign PEP, FATF call-for-action jurisdiction, SMR with continuing relationship, nested services, unusual transaction, high risk rating) and the model said otherwise, the tier is escalated to `enhanced` **only if a retrieved source covers the trigger**, and that source is cited. The answer is flagged for review.
 - **Abstention.** If no retrieved passage is similar enough, the assistant says so instead of generating. The model can also return `insufficient_information` and list what is missing.
@@ -62,7 +62,7 @@ Key design choices (each is switchable in `config.yaml`, and the evaluation abla
 
 A working pipeline isn't enough on its own; the evaluation is built to answer "is this better than the alternative, and for whom?":
 
-- **Against the model on its own.** The `closed_book` preset runs `llama3.1:8b` with no retrieval and asks it to name its legal basis. Its references are parsed and checked against the snapshot, so the report shows how often the bare model gets the tier wrong and how often it cites rules that don't exist (or the repealed 2007 Rules). The gap to the `full` column is what RAG adds.
+- **Against the model on its own.** The `closed_book` preset runs the answer model with no retrieval and asks it to name its legal basis. Its references are parsed and checked against the snapshot, so the report shows how often the bare model gets the tier wrong and how often it cites rules that don't exist (or the repealed 2007 Rules). The gap to the `full` column is what RAG adds.
 - **Against Walert.** The same measures Walert reported: % unanswered for out-of-knowledge-base questions, graded NDCG@1/3/5 for known and inferred questions, ROUGE-1 and BERTScore against written reference answers.
 - **Fairness.** 12 counterfactual variants change only a customer's name, country of birth, or which foreign country a PEP serves. The tier must not change (`fairness_tier_flip_rate_max: 0.0`).
 - **What the business cares about.** Under-application rate (the regulatory-exposure error), mandatory-ECDD recall, citation validity (can the answer be defended in an audit) and latency.
@@ -72,9 +72,10 @@ A working pipeline isn't enough on its own; the evaluation is built to answer "i
 **Prerequisites:** Python 3.10+, [Ollama](https://ollama.com) 0.5 or newer (for JSON-schema structured outputs) running locally.
 
 ```bash
-ollama pull nomic-embed-text
-ollama pull llama3.1:8b
-ollama pull llama3.2:3b        # optional fallback for a faster live demo
+ollama pull nomic-embed-text   # search
+ollama pull qwen3.5:9b         # answers (6.6 GB)
+ollama pull llama3.1:8b        # grades answers during evaluation; also the Milestone 1 baseline
+ollama pull qwen3.5:4b         # optional: faster fallback for the live demo (--fast)
 
 python -m venv .venv
 source .venv/bin/activate      # Windows: .venv\Scripts\activate
@@ -109,7 +110,7 @@ amlrag ask "A company's 45% shareholder is a serving member of a foreign parliam
 amlrag ask --mode explain "What is the difference between source of wealth and source of funds?"
 amlrag ask --closed-book "…"   # the same question with no retrieval, for side-by-side demos
 amlrag serve                   # http://127.0.0.1:8000
-amlrag serve --fast            # uses generation.fallback_model
+amlrag serve --fast            # uses generation.fallback_model (qwen3.5:4b)
 ```
 
 **3. Evaluate**
@@ -127,7 +128,7 @@ pip install -e ".[walert]"     # optional: adds BERTScore (PyTorch + roberta-lar
 
 Each run writes `predictions.jsonl`, `metrics.json`, `config_used.yaml` and a `report.md` with acceptance results, confusion matrix, per-customer-type accuracy, confidence calibration, consistency groups, Walert-comparable measures, counterfactual fairness and every failure with its retrieved and cited sources. See [docs/evaluation.md](docs/evaluation.md).
 
-The full gold set is 74 items. On a laptop with `llama3.1:8b` and the LLM judge, budget roughly a minute per item per preset; `--preset all` runs five presets, so start it before a break or use `--judge lexical` while iterating.
+The full gold set is 74 items. On a laptop with the LLM judge, budget roughly a minute per item per preset; `--preset all` runs five presets, so start it before a break or use `--judge lexical` while iterating.
 
 **4. Tests**
 
@@ -139,6 +140,22 @@ AMLRAG_RUN_EVAL=1 pytest tests/acceptance -v # live acceptance tests against con
 On Windows PowerShell: `$env:AMLRAG_RUN_EVAL="1"; pytest tests/acceptance -v`.
 
 The acceptance tests are the "test" in Test-Driven RAG: each threshold in `config.yaml → eval.thresholds` (for example `mandatory_ecdd_recall: 1.0`, `under_application_rate_max: 0.05`) is its own test, so a change to chunking, prompts or retrieval that regresses a property fails loudly.
+
+## Choosing the answer model
+
+`config.yaml → generation.model` is `qwen3.5:9b`. It replaced the Milestone 1 choice, `llama3.1:8b`, because it is two years newer and scores far higher on published knowledge and reasoning benchmarks at a laptop-friendly size (6.6 GB). The benchmarks don't measure citing legal text correctly, so compare the two on your own gold set and report what you find:
+
+```bash
+amlrag eval --preset full --model llama3.1:8b
+amlrag eval --preset full                        # qwen3.5:9b from config.yaml
+amlrag compare results/<llama run> results/<qwen run>
+```
+
+Results folders are named after the preset and model (e.g. `20261002-1410-full-qwen3.5-9b`), and `amlrag compare` puts any finished runs side by side, warning if they used different indexes or item counts. `--model` also works with `ask` and `serve`.
+
+- **Judge.** `eval.judge_model` stays `llama3.1:8b`, a different model family from the answer model, so answers aren't graded by the model that wrote them. If you evaluate with `--model llama3.1:8b`, switch the judge (e.g. `--judge lexical`, or `judge_model: qwen3.5:9b`) for that run.
+- **Memory.** On a 16 GB Mac the answer model and the judge don't both fit at once, so Ollama swaps them during evaluation. It works, just slower; `--judge lexical` avoids it while iterating. With 32 GB+, `qwen3.5:27b` is a large step up.
+- **Thinking.** `generation.think: false` switches off Qwen 3.5's reasoning phase. Set it to `null` to leave the model's default. Models that can't think ignore it; if your Ollama version rejects it, the client drops it automatically.
 
 ## Working without Ollama (frontend work, CI)
 
@@ -174,7 +191,7 @@ docs/evaluation.md          metric definitions, calibration and review procedure
 
 | Week | Plan | Where it lives |
 |---|---|---|
-| 1 | Knowledge base, chunking, nomic-embed-text + Chroma, Ollama llama3.1:8b, basic assistant | `amlrag fetch`, `amlrag build`, `amlrag ask` |
+| 1 | Knowledge base, chunking, nomic-embed-text + Chroma, Ollama llama3.1:8b, basic assistant | `amlrag fetch`, `amlrag build`, `amlrag ask` (the answer model has since moved to `qwen3.5:9b`; see *Choosing the answer model*) |
 | 2 | Gold set of ~35-40 scenarios; test retrieval, answers and citations; tune chunking and prompts; browser UI | `data/gold/`, `amlrag eval`, `config.yaml → chunking/retrieval`, `generate/prompts.py`, `amlrag serve` |
 | 3 | Effectiveness, faithfulness, attribution, consistency across customer types; final improvements; demo | `amlrag eval --preset all`, `report.md`, `comparison.md` (with the closed-book baseline, Walert measures and fairness) |
 
@@ -195,7 +212,8 @@ The ablation presets also map onto the brief's iterations: run `baseline` on the
 | `Index was built with hash:512 but the configured embedder is ollama:nomic-embed-text` | You built offline; run `amlrag build`. |
 | `chunks.jsonl changed since the index was built` | Run `amlrag build` (it rebuilds both). |
 | A legislation document yields few sections | Print a page of extracted text and compare it with `section_pattern` in `kb/sources.yaml`: `python -c "from pathlib import Path; from amlrag.ingest.parse_legislation import pdf_to_pages; print(pdf_to_pages(Path('kb/manual/rules2025.pdf'))[40])"` |
-| Answers are slow (> 30 s) | `amlrag serve --fast`; lower `retrieval.final_k` to 6; set `retrieval.use_fact_extraction: false` (one fewer model call). |
+| Answers are slow (> 30 s) | Check `generation.think` is `false`; `amlrag serve --fast` (uses `qwen3.5:4b`); lower `retrieval.final_k` to 6; set `retrieval.use_fact_extraction: false` (one fewer model call). |
+| `model did not return valid JSON` | Update Ollama (0.9+ keeps thinking out of the answer), or try `--model llama3.1:8b` to confirm it's model-specific. |
 | Warning "prompt filled the context window" | Raise `generation.num_ctx` or lower `retrieval.final_k` / `chunking.max_words`. |
 
 ## Sources in the knowledge base

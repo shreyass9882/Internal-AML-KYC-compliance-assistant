@@ -1,4 +1,4 @@
-"""Command-line interface: amlrag fetch | build | ask | eval | serve | doctor | stats."""
+"""Command-line interface: amlrag fetch | build | ask | eval | compare | serve | doctor | log | stats."""
 from __future__ import annotations
 
 import argparse
@@ -15,6 +15,8 @@ def _cfg(args):
     if getattr(args, "offline", False):
         cfg = cfg.override("embedding.backend", "hash").override("generation.backend", "stub") \
                  .override("eval.judge_backend", "lexical")
+    if getattr(args, "model", None):
+        cfg = cfg.override("generation.model", args.model)
     if getattr(args, "fast", False):
         cfg = cfg.override("generation.model", cfg.generation.fallback_model)
     if getattr(args, "closed_book", False):
@@ -160,7 +162,10 @@ def cmd_doctor(args) -> int:
         try:
             models = client.list_models()
             print(f"[ok] ollama {client.version() or ''} at {cfg.ollama.host}")
-            for need in {cfg.embedding.model, cfg.generation.model}:
+            needed = {cfg.embedding.model, cfg.generation.model}
+            if cfg.eval.judge_backend == "ollama":
+                needed.add(cfg.eval.judge_model)
+            for need in sorted(needed):
                 have = any(m == need or m.startswith(need + ":") or m.split(":")[0] == need for m in models)
                 print(f"[{'ok' if have else '!!'}] model {need}" + ("" if have else f"  -> ollama pull {need}"))
                 ok &= have
@@ -205,6 +210,19 @@ def cmd_log(args) -> int:
     return 0
 
 
+def cmd_compare(args) -> int:
+    from datetime import datetime
+    from pathlib import Path
+
+    from amlrag.eval.report import compare_runs
+
+    cfg = _cfg(args)
+    out = Path(args.out) if args.out else cfg.path("results_dir") / f"comparison-{datetime.now():%Y%m%d-%H%M%S}.md"
+    print(compare_runs([Path(d) for d in args.runs], out))
+    print(f"Written to {out}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(prog="amlrag", description=__doc__)
     p.add_argument("--config", help="path to config.yaml (default: nearest config.yaml)")
@@ -230,6 +248,7 @@ def main(argv: list[str] | None = None) -> None:
     sp.add_argument("--mode", choices=["determine", "explain"], default="determine")
     sp.add_argument("--json", action="store_true")
     sp.add_argument("--fast", action="store_true", help="use generation.fallback_model")
+    sp.add_argument("--model", help="answer model for this run, e.g. llama3.1:8b (overrides config.yaml)")
     sp.add_argument("--closed-book", action="store_true",
                     help="answer with no retrieval (the baseline RAG is compared against)")
 
@@ -242,11 +261,17 @@ def main(argv: list[str] | None = None) -> None:
     sp.add_argument("--tags", nargs="+", help="only items with any of these tags, e.g. fairness trap")
     sp.add_argument("--judge", choices=["ollama", "lexical"])
     sp.add_argument("--fast", action="store_true")
+    sp.add_argument("--model", help="answer model for this run, e.g. llama3.1:8b (overrides config.yaml)")
+
+    sp = add("compare", cmd_compare, "side-by-side table of finished eval runs (e.g. two models)")
+    sp.add_argument("runs", nargs="+", help="results/<run> folders")
+    sp.add_argument("--out", help="output Markdown file (default results/comparison-<time>.md)")
 
     sp = add("serve", cmd_serve, "start the web UI + API")
     sp.add_argument("--host", default="127.0.0.1")
     sp.add_argument("--port", type=int, default=8000)
     sp.add_argument("--fast", action="store_true")
+    sp.add_argument("--model", help="answer model for this run, e.g. llama3.1:8b (overrides config.yaml)")
 
     add("doctor", cmd_doctor, "check Ollama, models, snapshot and index")
     sp = add("log", cmd_log, "summarise or purge the query log")

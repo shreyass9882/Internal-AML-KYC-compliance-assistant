@@ -22,7 +22,8 @@ def make_llm(cfg: Config, model: str | None = None):
     g = cfg.generation
     if g.backend == "stub":
         return StubLLM()
-    return OllamaLLM(make_client(cfg), model or g.model, g.temperature, g.seed, g.num_ctx, g.num_predict)
+    return OllamaLLM(make_client(cfg), model or g.model, g.temperature, g.seed, g.num_ctx, g.num_predict,
+                     g.get("think", False))
 
 
 def make_judge(cfg: Config):
@@ -30,4 +31,4 @@ def make_judge(cfg: Config):
     if ev.judge_backend == "lexical" or cfg.generation.backend == "stub":
         return None
     g = cfg.generation
-    return OllamaLLM(make_client(cfg), ev.judge_model, 0.0, g.seed, g.num_ctx, 256)
+    return OllamaLLM(make_client(cfg), ev.judge_model, 0.0, g.seed, g.num_ctx, 256, ev.get("judge_think", False))

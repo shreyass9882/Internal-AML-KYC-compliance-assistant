@@ -1,4 +1,4 @@
-"""Ollama REST client for embeddings (nomic-embed-text) and chat (llama3.1:8b)."""
+"""Ollama REST client for embeddings (nomic-embed-text) and chat (qwen3.5:9b by default)."""
 from __future__ import annotations
 
 import json
@@ -13,7 +13,10 @@ log = logging.getLogger(__name__)
 
 
 class OllamaError(RuntimeError):
-    pass
+    def __init__(self, message: str, status: int | None = None, body: str = ""):
+        super().__init__(message)
+        self.status = status
+        self.body = body
 
 
 def _hint(host: str, model: str | None = None) -> str:
@@ -39,9 +42,11 @@ class OllamaClient:
             raise OllamaError(f"Ollama timed out after {self.timeout_s}s on {path}. Try a smaller model "
                               f"(generation.fallback_model) or raise ollama.timeout_s.") from exc
         if resp.status_code == 404 and model:
-            raise OllamaError(f"Ollama returned 404 for {path} with model {model!r}. " + _hint(self.host, model))
+            raise OllamaError(f"Ollama returned 404 for {path} with model {model!r}. " + _hint(self.host, model),
+                              404, resp.text[:300])
         if not resp.ok:
-            raise OllamaError(f"Ollama {path} failed ({resp.status_code}): {resp.text[:300]}")
+            raise OllamaError(f"Ollama {path} failed ({resp.status_code}): {resp.text[:300]}", resp.status_code,
+                              resp.text[:300])
         return resp.json()
 
     def list_models(self) -> list[str]:
@@ -94,9 +99,12 @@ class OllamaEmbedder:
         return self._embed([self.query_prefix + text])[0]
 
 
+_THINK_BLOCK = re.compile(r"<think>.*?(?:</think>|$)", re.S | re.I)
+
+
 def parse_json_loose(text: str) -> dict[str, Any]:
-    """Parse model output as JSON, tolerating code fences and leading/trailing prose."""
-    text = text.strip()
+    """Parse model output as JSON, tolerating code fences, leaked <think> reasoning and surrounding prose."""
+    text = _THINK_BLOCK.sub("", text).strip()
     text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text)
     try:
         return json.loads(text)
@@ -118,14 +126,34 @@ def parse_json_loose(text: str) -> dict[str, Any]:
 
 
 class OllamaLLM:
-    """Chat completion with JSON-schema constrained output (Ollama >= 0.5 structured outputs)."""
+    """Chat completion with JSON-schema constrained output (Ollama >= 0.5 structured outputs).
+
+    think: False turns off the reasoning phase of thinking models (Qwen 3.5, Gemma 4), which is slow
+    and can spill into the JSON. None leaves the model's default. Models that can't think ignore it;
+    if an Ollama version rejects the field instead, it is dropped and the request retried.
+    """
 
     def __init__(self, client: OllamaClient, model: str, temperature: float = 0.0, seed: int = 42,
-                 num_ctx: int = 8192, num_predict: int = 1024):
+                 num_ctx: int = 8192, num_predict: int = 1024, think: bool | str | None = False):
         self.client = client
         self.model = model
         self.options = {"temperature": temperature, "seed": seed, "num_ctx": num_ctx, "num_predict": num_predict}
+        self.think = think
+        self._send_think = think is not None
         self.name = f"ollama:{model}"
+
+    def _chat(self, payload: dict[str, Any]) -> dict[str, Any]:
+        if self._send_think:
+            payload = {**payload, "think": self.think}
+        try:
+            return self.client._post("/api/chat", payload, self.model)
+        except OllamaError as exc:
+            if self._send_think and exc.status == 400 and "think" in exc.body.lower():
+                log.warning("%s rejected the think setting; retrying without it", self.model)
+                self._send_think = False
+                payload = {k: v for k, v in payload.items() if k != "think"}
+                return self.client._post("/api/chat", payload, self.model)
+            raise
 
     def chat_json(self, messages: list[dict[str, str]], schema: dict[str, Any] | None = None,
                   task: str = "") -> tuple[dict[str, Any], dict[str, Any]]:
@@ -138,7 +166,7 @@ class OllamaLLM:
             "keep_alive": self.client.keep_alive,
         }
         t0 = time.perf_counter()
-        data = self.client._post("/api/chat", payload, self.model)
+        data = self._chat(payload)
         latency = time.perf_counter() - t0
         content = data.get("message", {}).get("content", "")
         stats = {
@@ -147,7 +175,11 @@ class OllamaLLM:
             "completion_tokens": data.get("eval_count"),
             "model": self.model,
             "task": task,
+            "thinking_chars": len(data.get("message", {}).get("thinking") or ""),
         }
+        if stats["thinking_chars"] and self.think is False:
+            log.warning("%s produced %d characters of thinking although think=false", self.model,
+                        stats["thinking_chars"])
         if stats["prompt_tokens"] and stats["prompt_tokens"] >= self.options["num_ctx"] - 16:
             log.warning("prompt filled the context window (%s tokens); sources may have been truncated",
                         stats["prompt_tokens"])
@@ -157,6 +189,6 @@ class OllamaLLM:
             # One retry with an explicit reminder; small models occasionally emit prose.
             payload["messages"] = messages + [{"role": "assistant", "content": content},
                                               {"role": "user", "content": "Return only the JSON object."}]
-            data = self.client._post("/api/chat", payload, self.model)
+            data = self._chat(payload)
             stats["retried"] = True
             return parse_json_loose(data.get("message", {}).get("content", "")), stats

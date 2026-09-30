@@ -117,3 +117,28 @@ def test_presets_toggle_components(built_cfg):
     assert apply_preset(built_cfg, "full").verification.guardrails is True
     with pytest.raises(ValueError):
         apply_preset(built_cfg, "nope")
+
+
+def test_model_override_and_results_folder_name(built_cfg):
+    import argparse
+
+    from amlrag.cli import _cfg
+    from amlrag.eval.runner import model_slug
+
+    args = argparse.Namespace(config=str(built_cfg.root / "config.yaml"), offline=False, model="llama3.1:8b",
+                              fast=False, closed_book=False)
+    cfg = _cfg(args)
+    assert cfg.generation.model == "llama3.1:8b"
+    assert model_slug(cfg.override("generation.backend", "ollama")) == "llama3.1-8b"
+    assert model_slug(built_cfg) == "stub"
+
+
+def test_compare_runs(built_cfg, tmp_path):
+    from amlrag.eval.report import compare_runs
+    from amlrag.eval.runner import run_eval
+
+    a, _ = run_eval(built_cfg, preset="baseline", verbose=False, out_dir=tmp_path / "a")
+    b, _ = run_eval(built_cfg, preset="full", verbose=False, out_dir=tmp_path / "b")
+    text = compare_runs([a, b], tmp_path / "cmp.md")
+    assert "| Metric | baseline · stub | full · stub |" in text
+    assert "tier_accuracy_acceptable" in text and "not directly comparable" not in text

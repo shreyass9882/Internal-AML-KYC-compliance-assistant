@@ -12,6 +12,8 @@ class FakeOllama(BaseHTTPRequestHandler):
     requests: list = []
     embed_404 = False
     chat_replies: list = []
+    reject_think = False
+    thinking = ""
 
     def log_message(self, *a):
         pass
@@ -42,8 +44,13 @@ class FakeOllama(BaseHTTPRequestHandler):
         if self.path == "/api/embeddings":
             return self._send(200, {"embedding": [float(len(body["prompt"])), 1.0]})
         if self.path == "/api/chat":
+            if FakeOllama.reject_think and "think" in body:
+                return self._send(400, {"error": '"llama3.1:8b" does not support thinking'})
             content = FakeOllama.chat_replies.pop(0) if FakeOllama.chat_replies else '{"ok": true}'
-            return self._send(200, {"message": {"content": content}, "prompt_eval_count": 100, "eval_count": 20})
+            msg = {"content": content}
+            if FakeOllama.thinking:
+                msg["thinking"] = FakeOllama.thinking
+            return self._send(200, {"message": msg, "prompt_eval_count": 100, "eval_count": 20})
         self._send(404, {})
 
 
@@ -52,6 +59,8 @@ def server():
     FakeOllama.requests = []
     FakeOllama.embed_404 = False
     FakeOllama.chat_replies = []
+    FakeOllama.reject_think = False
+    FakeOllama.thinking = ""
     httpd = HTTPServer(("127.0.0.1", 0), FakeOllama)
     t = threading.Thread(target=httpd.serve_forever, daemon=True)
     t.start()
@@ -109,3 +118,33 @@ def test_parse_json_loose():
     assert parse_json_loose('noise {"a": {"b": 2}} trailing') == {"a": {"b": 2}}
     with pytest.raises(ValueError):
         parse_json_loose("no json at all")
+
+
+def test_think_false_is_sent_by_default(server):
+    OllamaLLM(OllamaClient(server), "qwen3.5:9b").chat_json([{"role": "user", "content": "x"}])
+    assert FakeOllama.requests[-1][1]["think"] is False
+
+
+def test_think_none_leaves_model_default(server):
+    OllamaLLM(OllamaClient(server), "qwen3.5:9b", think=None).chat_json([{"role": "user", "content": "x"}])
+    assert "think" not in FakeOllama.requests[-1][1]
+
+
+def test_think_rejected_is_dropped_and_remembered(server):
+    FakeOllama.reject_think = True
+    FakeOllama.chat_replies = ['{"a": 1}', '{"b": 2}']
+    llm = OllamaLLM(OllamaClient(server), "llama3.1:8b")
+    assert llm.chat_json([{"role": "user", "content": "x"}])[0] == {"a": 1}
+    assert llm.chat_json([{"role": "user", "content": "y"}])[0] == {"b": 2}
+    chats = [b for p, b in FakeOllama.requests if p == "/api/chat"]
+    assert ["think" in b for b in chats] == [True, False, False]     # one rejected try, then never again
+
+
+def test_thinking_output_is_reported(server):
+    FakeOllama.thinking = "Let me consider the rules..."
+    _, stats = OllamaLLM(OllamaClient(server), "qwen3.5:9b").chat_json([{"role": "user", "content": "x"}])
+    assert stats["thinking_chars"] == len("Let me consider the rules...")
+
+
+def test_leaked_think_block_is_stripped():
+    assert parse_json_loose('<think>The customer is a PEP {so}</think>\n{"tier": "enhanced"}') == {"tier": "enhanced"}
