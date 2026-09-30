@@ -65,6 +65,13 @@
       $("status-text").textContent = `Knowledge base ${h.snapshot || "unversioned"} · ${h.chunks} passages · ${h.generator.replace("ollama:", "")}`;
       $("snapshot-note").textContent = h.snapshot ? ` Knowledge base snapshot: ${h.snapshot}.` : "";
       $("stub-banner").hidden = !h.offline_stub;
+      const ql = h.query_log || {};
+      const logged = !ql.enabled ? "Questions are not logged."
+        : ql.store_text === "none" ? "Only outcomes are logged, not the question."
+        : ql.store_text === "full" ? "Questions are logged as typed."
+        : "Questions are logged with identifiers masked";
+      const kept = ql.enabled && ql.retention_days ? ` and deleted after ${ql.retention_days} days.` : ql.enabled && ql.store_text !== "none" ? "." : "";
+      $("privacy-note").textContent = `Describe the customer; don't type names, addresses or ID numbers. ${logged}${kept}`;
     } catch (err) {
       $("status-dot").className = "dot bad";
       $("status-text").textContent = `Not ready: ${err.message}`;
@@ -255,7 +262,7 @@
       return el("tr", {},
         el("td", { text: new Date(q.ts).toLocaleString() }),
         el("td", { text: q.mode }),
-        el("td", { class: "q", text: q.query }),
+        el("td", { class: q.query ? "q" : "q muted", text: q.query || "(question not stored)" }),
         el("td", {}, el("span", { class: cls, text: outcome }), el("div", { class: "muted", text: q.confidence ? `${q.confidence} confidence` : "" })),
         el("td", { class: "muted", text: q.reason || "" }),
         el("td", { text: q.feedback ? q.feedback.replace("_", " ") : "" }));

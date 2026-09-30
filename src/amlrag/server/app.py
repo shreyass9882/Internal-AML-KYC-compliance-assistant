@@ -48,7 +48,7 @@ class FeedbackRequest(BaseModel):
 
 def create_app(cfg: Config, assistant=None) -> FastAPI:
     app = FastAPI(title="AML/CTF CDD Compliance Assistant", version="0.1.0")
-    qlog = QueryLog(cfg.path("query_log"))
+    qlog = QueryLog.from_config(cfg)
     state: dict[str, Any] = {"assistant": assistant, "error": None}
     lock = threading.Lock()
 
@@ -70,6 +70,7 @@ def create_app(cfg: Config, assistant=None) -> FastAPI:
         a = get_assistant()
         result = a.ask(mode, req.text)
         result["query_id"] = qlog.record(result)
+        result.pop("flag_reason", None)
         return result
 
     @app.post("/api/determine")
@@ -103,7 +104,9 @@ def create_app(cfg: Config, assistant=None) -> FastAPI:
         manifest = a.retriever.store.manifest
         return {"ok": True, "snapshot": a.snapshot, "chunks": manifest.get("chunks"),
                 "embedder": a.embedder_name, "generator": getattr(a.llm, "name", "?"),
-                "offline_stub": a.offline_stub, "built_at": manifest.get("built_at")}
+                "offline_stub": a.offline_stub, "built_at": manifest.get("built_at"),
+                "query_log": {"enabled": qlog.enabled, "store_text": qlog.store_text,
+                              "retention_days": qlog.retention_days}}
 
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
 

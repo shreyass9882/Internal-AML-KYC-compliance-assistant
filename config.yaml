@@ -72,6 +72,15 @@ verification:
   # flag:     keep the model's tier but mark needs_review with a warning.
   guardrail_mode: escalate
 
+query_log:
+  enabled: true
+  # What is stored of each question for the Review gaps view:
+  #   redacted (default): emails, phones, dates, addresses, long numbers and most names masked
+  #   full: stored as typed (only for test data)
+  #   none: only the outcome (tier, confidence, flags) is stored, not the question
+  store_text: redacted
+  retention_days: 30           # rows older than this are deleted; 0 = keep forever
+
 eval:
   judge_backend: ollama        # ollama | lexical
   judge_model: llama3.1:8b     # ideally a *different* model family (e.g. qwen2.5:7b) to reduce self-grading bias

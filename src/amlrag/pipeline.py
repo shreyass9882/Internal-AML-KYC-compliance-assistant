@@ -21,6 +21,14 @@ from amlrag.retrieve.hybrid import Retriever
 log = logging.getLogger(__name__)
 
 DETERMINE_GROUPS = {"reasoning": "point", "required_measures": "measure"}
+
+# System-generated reasons for flagging an answer. Stored in the query log instead of
+# the model's own wording, which can repeat customer names from the question.
+FLAG_NO_GUIDANCE = "No guidance in the knowledge base was close enough to answer"
+FLAG_MODEL_ERROR = "The language model failed to respond"
+FLAG_NO_CITATION = "Answer withheld: no valid citation"
+FLAG_MODEL_ABSTAINED = "The model could not answer from the sources"
+FLAG_ESCALATED = "Tier escalated by guardrail"
 EXPLAIN_GROUPS = {"key_points": "point"}
 
 
@@ -55,11 +63,12 @@ class Assistant:
         return out
 
     def _abstain(self, mode: str, query: str, reason: str, results: list[Retrieved], facts, timings,
-                 missing: list[str] | None = None) -> dict[str, Any]:
+                 flag_reason: str, missing: list[str] | None = None) -> dict[str, Any]:
         return {
             "mode": mode, "query": query, "tier": ABSTAIN if mode == "determine" else None, "model_tier": None,
             "summary": reason, "points": [], "missing_information": missing or [], "confidence": "low",
-            "abstained": True, "abstain_reason": reason, "needs_review": True, "warnings": [],
+            "abstained": True, "abstain_reason": reason, "flag_reason": flag_reason, "needs_review": True,
+            "warnings": [],
             "facts": facts, "sources": self._sources(results, []), "checks": {}, "timings": timings,
             "models": {"embedder": self.embedder_name, "generator": getattr(self.llm, "name", "?")},
             "snapshot": self.snapshot, "offline_stub": self.offline_stub,
@@ -88,7 +97,7 @@ class Assistant:
             return self._abstain("determine", scenario,
                                  "The knowledge base has no guidance close enough to this scenario to make a "
                                  "determination. Check the scenario is about customer due diligence, or escalate.",
-                                 results, facts, timings)
+                                 results, facts, timings, FLAG_NO_GUIDANCE)
 
         messages, label_map = determine_messages(scenario, results, facts)
         t0 = time.perf_counter()
@@ -98,7 +107,7 @@ class Assistant:
             log.exception("generation failed")
             timings["total_s"] = round(time.perf_counter() - t_start, 3)
             return self._abstain("determine", scenario, f"The language model failed to answer ({exc}).",
-                                 results, facts, timings)
+                                 results, facts, timings, FLAG_MODEL_ERROR)
         timings["generation_s"] = round(time.perf_counter() - t0, 3)
 
         model_tier = out.get("tier") if out.get("tier") in DETERMINE_SCHEMA["properties"]["tier"]["enum"] else ABSTAIN
@@ -117,12 +126,16 @@ class Assistant:
         final_tier = guard["tier"]
 
         abstained = final_tier == ABSTAIN
-        abstain_reason = None
+        abstain_reason = flag_reason = None
         if not abstained and not ver.cited_labels:
             abstained, final_tier = True, ABSTAIN
             abstain_reason = "The model gave a determination without any valid citation, so it was withheld."
+            flag_reason = FLAG_NO_CITATION
         elif abstained:
             abstain_reason = out.get("summary") or "The sources do not support a determination."
+            flag_reason = FLAG_MODEL_ABSTAINED
+        elif guard["escalated"]:
+            flag_reason = FLAG_ESCALATED
 
         points = [{"group": g, **p.to_dict(label_map)} for g, ps in ver.points.items() for p in ps]
         timings["total_s"] = round(time.perf_counter() - t_start, 3)
@@ -131,7 +144,7 @@ class Assistant:
             "summary": str(out.get("summary", "")).strip(), "points": points,
             "missing_information": [str(m) for m in out.get("missing_information", [])],
             "confidence": "low" if abstained else confidence, "abstained": abstained,
-            "abstain_reason": abstain_reason,
+            "abstain_reason": abstain_reason, "flag_reason": flag_reason,
             "needs_review": abstained or confidence == "low" or bool(warnings),
             "warnings": warnings, "facts": facts, "guardrails_fired": guard["fired"],
             "escalated": guard["escalated"], "sources": self._sources(results, ver.cited_labels),
@@ -154,7 +167,7 @@ class Assistant:
             return self._abstain("explain", question,
                                  "The knowledge base does not cover this question. It currently holds AUSTRAC "
                                  "customer due diligence guidance and Part 6 of the AML/CTF Rules 2025.",
-                                 results, None, timings)
+                                 results, None, timings, FLAG_NO_GUIDANCE)
         messages, label_map = explain_messages(question, results)
         t0 = time.perf_counter()
         try:
@@ -163,7 +176,7 @@ class Assistant:
             log.exception("generation failed")
             timings["total_s"] = round(time.perf_counter() - t_start, 3)
             return self._abstain("explain", question, f"The language model failed to answer ({exc}).",
-                                 results, None, timings)
+                                 results, None, timings, FLAG_MODEL_ERROR)
         timings["generation_s"] = round(time.perf_counter() - t0, 3)
 
         ver = verify(out, label_map, self.cfg.verification.min_support_overlap, EXPLAIN_GROUPS)
@@ -178,6 +191,8 @@ class Assistant:
             "missing_information": [str(m) for m in out.get("missing_information", [])],
             "confidence": confidence if answerable else "low", "abstained": not answerable,
             "abstain_reason": None if answerable else (out.get("summary") or "The sources do not answer this."),
+            "flag_reason": None if answerable else (FLAG_MODEL_ABSTAINED if not out.get("answerable", True)
+                                                    else FLAG_NO_CITATION),
             "needs_review": (not answerable) or confidence == "low" or bool(notes), "warnings": notes,
             "facts": None, "sources": self._sources(results, ver.cited_labels if answerable else []),
             "checks": {"citation_validity": round(ver.citation_validity, 3), "points": len(ver.all_points),

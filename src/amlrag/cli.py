@@ -179,6 +179,23 @@ def cmd_stats(args) -> int:
     return 0
 
 
+def cmd_log(args) -> int:
+    from amlrag.querylog import QueryLog
+
+    cfg = _cfg(args)
+    qlog = QueryLog.from_config(cfg)
+    if args.purge_all:
+        print(f"Deleted {qlog.purge_all()} logged queries.")
+    elif args.purge_older_than is not None:
+        print(f"Deleted {qlog.purge_older_than(args.purge_older_than)} queries older than "
+              f"{args.purge_older_than} days.")
+    s = qlog.summary()
+    print(f"{s['total']} queries logged ({s['abstained']} abstained, {s['needs_review']} flagged for review); "
+          f"text stored: {s['store_text']}; retention: "
+          f"{str(s['retention_days']) + ' days' if s['retention_days'] else 'forever'}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(prog="amlrag", description=__doc__)
     p.add_argument("--config", help="path to config.yaml (default: nearest config.yaml)")
@@ -219,6 +236,9 @@ def main(argv: list[str] | None = None) -> None:
     sp.add_argument("--fast", action="store_true")
 
     add("doctor", cmd_doctor, "check Ollama, models, snapshot and index")
+    sp = add("log", cmd_log, "summarise or purge the query log")
+    sp.add_argument("--purge-all", action="store_true", help="delete every logged query")
+    sp.add_argument("--purge-older-than", type=int, metavar="DAYS")
     sp = add("stats", cmd_stats, "chunk statistics / grep chunks")
     sp.add_argument("--grep")
 
