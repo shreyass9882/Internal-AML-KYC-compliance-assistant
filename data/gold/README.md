@@ -45,7 +45,9 @@ For each item:
 5. Resolve anything the `notes` field flags as needing confirmation (for example whether immediate family members of PEPs fall within the amended definition, or how rule 6-22 applies).
 6. Set `"status": "reviewed"` and `"reviewer": "<name>"`. When a base scenario changes, update its counterfactual variants to match.
 
-Items flagged in `notes` as needing confirmation: D03, D09, D14, D15, D23, D24, D41, D46, D49, E04. Resolve these first.
+Items flagged in `notes` as needing confirmation: D03, D09, D14, D23, D24, D41, D46, D49. Resolve these first.
+
+Several items were checked against the text of **Rules 2025 Compilation No. 1 (31 March 2026)**; their `notes` start "Checked against…". Two findings changed the set: the 2026 amendments moved beneficial-owner relief for government bodies from rule 6-18 to rule 6-7(1A)/(1B), so D28, D35, D47, D48 and E08 now cite 6-7; and rule 6-22(1) makes enhanced CDD mandatory for cash-funded virtual asset services, so D09 is now `mandatory_ecdd`. D15 and E04 were confirmed. The notes on D23, D24 and D49 explain where the text doesn't support the draft answer as clearly as assumed.
 
 Counterfactual variants avoid countries on FATF lists so that only the name or birthplace changes; if FATF's lists change before your snapshot, check none of the named countries has been added.
 

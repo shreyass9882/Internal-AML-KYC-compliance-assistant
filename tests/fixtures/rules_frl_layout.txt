@@ -1,0 +1,74 @@
+Prepared by the Office of Parliamentary Counsel, Canberra
+Synthetic Test Rules 2025
+Compilation No. 1
+Compilation date: 31 March 2026
+Authorised Version F2099C00001 registered 31/03/2026
+
+Synthetic Test Rules 2025 i
+Compilation No. 1 Compilation date: 31/03/2026
+Contents
+Part 1—Preliminary 1
+1-1 Name.............................................................................................................1
+1-4 Definitions ....................................................................................................1
+Part 6—Customer due diligence 2
+Division 1—Initial customer due diligence 2
+6-1 Customer is sole trader ...............................................................................2
+6-2 Customer is body corporate, partnership or unincorporated
+association ....................................................................................................2
+6-9 The nature and purpose of the business relationship or occasional
+transaction ...................................................................................................3
+Division 3—Simplified customer due diligence 3
+6-18 Simplified initial customer due diligence for identity of beneficial
+owners .........................................................................................................3
+Authorised Version F2099C00001 registered 31/03/2026
+
+Part 1—Preliminary
+1-1 Name
+This instrument is the synthetic test version of the Rules, used only by the parser tests.
+1-4 Definitions
+In this instrument, beneficial owner has the meaning given by the Act, and politically exposed person
+has the meaning given by the Act.
+Authorised Version F2099C00001 registered 31/03/2026
+
+Customer due diligence Part 6
+Initial customer due diligence Division 1
+Section 6-1
+Synthetic Test Rules 2025 2
+Compilation No. 1 Compilation date: 31/03/2026
+Part 6—Customer due diligence
+Division 1—Initial customer due diligence
+6-1 Customer is sole trader
+(1) The reporting entity must collect at least the following KYC information:
+(a) the customer's full name;
+(b) any business name used for the conduct of the business;
+(c) the address of the principal place of business.
+6-2 Customer is body corporate, partnership or unincorporated association
+(1) The reporting entity must collect at least the following KYC information:
+(a) the customer's full name;
+(b) any business names of the customer;
+Authorised Version F2099C00001 registered 31/03/2026
+
+Part 6 Customer due diligence
+Division 1 Initial customer due diligence
+Section 6-2
+3 Synthetic Test Rules 2025
+Compilation No. 1 Compilation date: 31/03/2026
+(c) evidence of the customer's existence.
+6-9 The nature and purpose of the business relationship or occasional
+transaction
+For the purposes of the Act, a reporting entity is taken to have established the matter if:
+(a) the customer's full name has been collected; and
+(b) the reporting entity has identified the ML/TF risk of the customer.
+Division 3—Simplified customer due diligence
+6-18 Simplified initial customer due diligence for identity of beneficial owners
+(1) A reporting entity is taken to have established the beneficial owners of a customer if the customer is
+subject to oversight by a prudential regulator.
+Note: (a) the customer's full name; appears here as a repeated body line and must not be stripped.
+Authorised Version F2099C00001 registered 31/03/2026
+
+Endnotes
+Endnote 4—Amendment history
+Synthetic Test Rules 2025 4
+Provision affected How affected
+s 6-18 .............................................. am F2099L00002
+Authorised Version F2099C00001 registered 31/03/2026

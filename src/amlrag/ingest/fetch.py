@@ -176,7 +176,7 @@ def fetch_snapshot(cfg: Config, refresh: bool = False, only: list[str] | None = 
     report: dict[str, list[str]] = {"fetched": [], "skipped": [], "changed": [], "failed": [], "manual": []}
 
     def save(doc_id: str, url: str, title: str | None, discovered: bool) -> bytes | None:
-        manual = next((cfg.path("manual_dir") / f"{doc_id}{e}" for e in (".pdf", ".html")
+        manual = next((cfg.path("manual_dir") / f"{doc_id}{e}" for e in (".pdf", ".html", ".htm", ".txt")
                        if (cfg.path("manual_dir") / f"{doc_id}{e}").exists()), None)
         if manual is not None:
             data = manual.read_bytes()
@@ -185,7 +185,7 @@ def fetch_snapshot(cfg: Config, refresh: bool = False, only: list[str] | None = 
                                "fetched_at": datetime.fromtimestamp(manual.stat().st_mtime, timezone.utc).isoformat(),
                                "title": title, "discovered": discovered}
             report["manual"].append(doc_id)
-            return data if manual.suffix == ".html" else None
+            return data if manual.suffix in (".html", ".htm") else None
         if not url:
             return None
         if doc_id in entries and not refresh and (cfg.root / entries[doc_id].get("file", "")).exists():

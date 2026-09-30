@@ -28,9 +28,11 @@ documents:
     short: AML/CTF Rules 2025
     kind: legislation
     # As-made version (29 Aug 2025). The 2026 amendment rules (F2026L00353)
-    # changed parts of the text: for the final snapshot download the *latest
-    # compilation* PDF from https://www.legislation.gov.au/F2025L01026/latest
-    # and save it as kb/manual/rules2025.pdf.
+    # changed parts of the text (e.g. rule 6-18): for the final snapshot use the
+    # latest compilation (Compilation No. 1, 31 Mar 2026 at the time of writing)
+    # from https://www.legislation.gov.au/F2025L01026/latest and save it as
+    # kb/manual/rules2025.pdf, or a text export of it as kb/manual/rules2025.txt
+    # (the text export of Compilation No. 1 has been checked against the parser).
     url: https://www.legislation.gov.au/F2025L01026/asmade/2025-08-29/text/original/pdf
     section_label: "s"
     # Rules sections are numbered "<part>-<section>", e.g. "6-23".

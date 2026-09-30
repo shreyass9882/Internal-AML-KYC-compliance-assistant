@@ -35,9 +35,33 @@ _EDGE_NOISE = re.compile(
     r"|^(Part|Division|Subdivision)\s+\d+[A-Z]?$"
     r"|^.{3,90}\s(Part|Division|Subdivision)\s+\d+[A-Z]?$"
     r"|^(Part|Division|Subdivision)\s+\d+[A-Z]?\s+[A-Z][^\u2014\u2013]{2,90}$"
-    r"|Compilation (No\.|date)|Registered:|Authorised Version",
+    r"|Compilation (No\.|date)|Registered:|Authorised Version"
+    # running title with a page number: "Anti-Money ... Rules 2025 57" / "58 Anti-Money ... Rules 2025"
+    r"|^\d{1,4}\s+[A-Z][^.;:()]{5,140}\b(Rules|Act|Regulations?)\s+\d{4}$"
+    r"|^[A-Z][^.;:()]{5,140}\b(Rules|Act|Regulations?)\s+\d{4}\s+(\d{1,4}|[ivxlc]{1,6})$",
 )
-_EDGE_TOP, _EDGE_BOTTOM = 5, 3
+_EDGE_TOP, _EDGE_BOTTOM = 6, 3
+# Every page of a Federal Register compilation ends with this footer; text exports keep it,
+# so it marks page breaks when the text has no form feeds.
+_FRL_FOOTER = re.compile(r"^Authorised Version \S+ registered \d{1,2}/\d{1,2}/\d{4}$")
+# Table-of-contents entries end in dot leaders and a page number ("6-1 Sole trader ......57", "... iv").
+_LEADER_RE = re.compile(r"\.{4,}\s*(\d{1,4}|[ivxlc]{1,6})\s*$", re.I)
+_HEADING_START = re.compile(r"^(Part|Division|Subdivision|Schedule)\s+\d|^\d{1,2}-\d{1,3}[A-Z]?\s|^\d{1,3}[A-Z]{0,2}\s+[A-Z]")
+
+
+def text_to_pages(text: str) -> list[str]:
+    """Split a plain-text export into pages (form feeds, else Federal Register page footers)."""
+    if "\f" in text:
+        return text.split("\f")
+    pages, cur = [], []
+    for line in text.splitlines():
+        cur.append(line)
+        if _FRL_FOOTER.match(line.strip()):
+            pages.append("\n".join(cur))
+            cur = []
+    if cur:
+        pages.append("\n".join(cur))
+    return pages if len(pages) >= 3 else [text]
 
 
 def _strip_running_heads(pages: list[str]) -> list[str]:
@@ -45,23 +69,42 @@ def _strip_running_heads(pages: list[str]) -> list[str]:
     def norm(line: str) -> str:
         return re.sub(r"\d+", "#", line.strip())
 
+    single = len(pages) == 1          # no page structure found: be conservative about repeats
     counts: Counter[str] = Counter()
     for page in pages:
         for line in set(norm(l) for l in page.splitlines() if l.strip()):
             counts[line] += 1
-    threshold = max(3, int(0.3 * len(pages)))
+    if single:
+        counts = Counter(norm(l) for l in pages[0].splitlines() if l.strip())
+        threshold = 15
+    else:
+        threshold = max(3, int(0.3 * len(pages)))
     repeated = {l for l, c in counts.items() if c >= threshold and len(l) < 160}
     lines: list[str] = []
     for page in pages:
         page_lines = [l.strip() for l in page.splitlines() if l.strip()]
         for i, s in enumerate(page_lines):
-            if _PAGE_NUM_RE.match(s) or norm(s) in repeated:
+            if _PAGE_NUM_RE.match(s) or norm(s) in repeated or _FRL_FOOTER.match(s):
                 continue
-            at_edge = i < _EDGE_TOP or i >= len(page_lines) - _EDGE_BOTTOM
+            at_edge = single or i < _EDGE_TOP or i >= len(page_lines) - _EDGE_BOTTOM
             if at_edge and _EDGE_NOISE.search(s):
                 continue
             lines.append(_clean_line(s))
     return lines
+
+
+def _drop_toc(lines: list[str]) -> list[str]:
+    """Remove table-of-contents entries, including entries wrapped over two or more lines.
+
+    A wrapped entry ("6-18 Simplified initial customer due diligence for identity of beneficial" /
+    "owners ......57") would otherwise look like a real section heading and, being out of
+    order, knock the genuine sections that follow out of the parse.
+    """
+    toc = [bool(_LEADER_RE.search(l)) for l in lines]
+    for i in range(len(lines) - 2, -1, -1):
+        if not toc[i] and toc[i + 1] and not _HEADING_START.match(lines[i + 1]):
+            toc[i] = True
+    return [l for l, t in zip(lines, toc) if not t]
 
 
 @dataclass
@@ -70,6 +113,13 @@ class _Heading:
     kind: str          # part | division | section
     number: str
     title: str
+    extra: int = 0     # continuation lines folded into the title
+
+
+def _title_continuation(heading: str, nxt: str | None) -> bool:
+    """A long heading followed by a short lowercase line is a title that wrapped ("...or occasional" / "transaction")."""
+    return (nxt is not None and len(heading) >= 45 and len(nxt) <= 80 and nxt[:1].islower()
+            and not heading.rstrip().endswith((".", ":", ";")))
 
 
 def _section_sort_key(number: str) -> tuple:
@@ -111,20 +161,28 @@ def parse_legislation_lines(
     url: str | None = None,
 ) -> list[Section]:
     sec_re = re.compile(section_pattern)
+    lines = _drop_toc(lines)
     heads: list[_Heading] = []
     for i, line in enumerate(lines):
         if m := _PART_RE.match(line):
-            heads.append(_Heading(i, "part", m.group(1), m.group(2).strip()))
+            h = _Heading(i, "part", m.group(1), m.group(2).strip())
         elif m := _DIV_RE.match(line):
-            heads.append(_Heading(i, "division", m.group(1), m.group(2).strip()))
+            h = _Heading(i, "division", m.group(1), m.group(2).strip())
         elif m := sec_re.match(line):
-            heads.append(_Heading(i, "section", m.group(1), m.group(2).strip()))
+            h = _Heading(i, "section", m.group(1), m.group(2).strip())
+        else:
+            continue
+        nxt = lines[i + 1] if i + 1 < len(lines) else None
+        if _title_continuation(line, nxt):
+            h.title = f"{h.title} {nxt.strip()}"
+            h.extra = 1
+        heads.append(h)
 
     # 1) Drop table-of-contents entries: trailing page numbers, or no body before the next heading.
     kept: list[_Heading] = []
     for j, h in enumerate(heads):
         nxt = heads[j + 1].idx if j + 1 < len(heads) else len(lines)
-        body_len = sum(len(l) for l in lines[h.idx + 1:nxt])
+        body_len = sum(len(l) for l in lines[h.idx + 1 + h.extra:nxt])
         if _TOC_TAIL_RE.search(h.title) and body_len < 60:
             continue
         if h.kind == "section" and body_len < 40:
@@ -154,7 +212,7 @@ def parse_legislation_lines(
             division = (h.number, h.title)
             continue
         nxt = heads2[j + 1].idx if j + 1 < len(heads2) else len(lines)
-        body = _join_body(lines[h.idx + 1:nxt])
+        body = _join_body(lines[h.idx + 1 + h.extra:nxt])
         part_no = part[0] if part else (h.number.split("-")[0] if "-" in h.number else None)
         if include_parts and part_no not in include_parts:
             continue
@@ -185,9 +243,6 @@ def parse_legislation_file(path: Path, doc_id: str, doc_title: str, doc_short: s
     if path.suffix.lower() == ".pdf":
         lines = _strip_running_heads(pdf_to_pages(path))
     else:
-        raw = [_clean_line(l) for l in path.read_text(encoding="utf-8").splitlines() if l.strip()]
-        counts = Counter(raw)
-        # Plain-text exports keep running heads too; drop lines repeated 3+ times.
-        lines = [l for l in raw if counts[l] < 3 or _PART_RE.match(l) or _DIV_RE.match(l)]
+        lines = _strip_running_heads(text_to_pages(path.read_text(encoding="utf-8", errors="replace")))
     return parse_legislation_lines(lines, doc_id, doc_title, doc_short, section_pattern, section_label,
                                    include_parts, url)

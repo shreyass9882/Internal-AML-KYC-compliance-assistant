@@ -125,3 +125,36 @@ def test_embed_text_carries_context_header():
     c = chunk_section(next(s for s in _rules() if s.section_key == "6-18"))[0]
     assert c.embed_text().startswith("AML/CTF Rules 2025, s 6-18")
     assert "Division 3" in c.embed_text()
+
+
+def test_federal_register_text_export_layout():
+    """Mirrors a real compilation exported to text: wrapped contents entries, page footers,
+    running heads, wrapped section titles and body lines that repeat across sections."""
+    secs = parse_legislation_file(FIX / "rules_frl_layout.txt", "rules2025", "Rules", "AML/CTF Rules 2025",
+                                  RULES_PATTERN, "s", ["1", "6"])
+    by_key = {s.section_key: s for s in secs}
+    # A wrapped contents entry must not knock out the real sections that follow it.
+    assert list(by_key) == ["1-1", "1-4", "6-1", "6-2", "6-9", "6-18"]
+    # Wrapped titles are joined; the continuation doesn't leak into the body.
+    assert by_key["6-9"].section_title == ("The nature and purpose of the business relationship or occasional "
+                                          "transaction")
+    assert by_key["6-9"].text.startswith("For the purposes of the Act")
+    # Page footers and running heads are gone, even mid-section across a page break.
+    body = "\n".join(s.text for s in secs)
+    for noise in ("Authorised Version", "Compilation No", "Section 6-2", "Synthetic Test Rules 2025 2",
+                  "3 Synthetic Test Rules", "Customer due diligence Part 6", "Part 6 Customer due diligence"):
+        assert noise not in body, noise
+    assert by_key["6-2"].text.rstrip().endswith("(c) evidence of the customer's existence.")
+    # Body lines that repeat across sections are kept.
+    assert all("(a) the customer's full name;" in by_key[k].text for k in ("6-1", "6-2", "6-18"))
+    # Endnotes after the last Part don't create sections.
+    assert by_key["6-18"].heading_path[1] == "Division 3—Simplified customer due diligence"
+
+
+def test_text_to_pages():
+    from amlrag.ingest.parse_legislation import text_to_pages
+
+    assert len(text_to_pages("a\fb\fc")) == 3
+    frl = "\n".join(f"line {i}\nAuthorised Version F1 registered 01/01/2026" for i in range(4))
+    assert len(text_to_pages(frl)) == 4
+    assert text_to_pages("no page breaks here") == ["no page breaks here"]
