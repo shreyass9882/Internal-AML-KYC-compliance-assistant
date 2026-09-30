@@ -66,19 +66,29 @@ def test_thresholds_directions():
 
 
 def test_project_gold_set_is_valid_and_consistent():
+    from collections import Counter
+
     items = load_gold(REPO / "data" / "gold" / "scenarios.jsonl")
-    assert 35 <= len(items) <= 45
-    det = [i for i in items if i.mode == "determine"]
+    base = [i for i in items if not i.is_variant]
+    det = [i for i in base if i.mode == "determine"]
+    scenarios = [i for i in det if i.answerable]
+    assert len(scenarios) >= 35, "Milestone 1 plan: 35-40 customer scenarios"
     assert {i.expected_tier for i in det} >= {"simplified", "standard", "enhanced", "insufficient_information"}
-    assert sum(not i.answerable for i in items) >= 4
+    types = Counter(i.customer_type for i in scenarios)
+    thin = {t: n for t, n in types.items() if t != "other" and n < 3}
+    assert not thin, f"customer types with fewer than 3 scenarios: {thin}"
+    assert sum(i.category == "out_of_kb" for i in base) >= 5          # Walert's % unanswered needs enough items
+    assert sum(i.is_variant for i in items) >= 12
     groups = {}
     for i in det:
         if i.group:
             groups.setdefault(i.group, set()).add(i.expected_tier)
     assert all(len(v) == 1 for v in groups.values()), "items in a consistency group must share the expected tier"
     for i in items:
-        for ref in i.expected_sections:
+        for ref in i.expected_sections + i.partial_sections:
             assert ref.count("::") <= 1 and ref.strip() == ref
+        if i.answerable:
+            assert i.category in ("known", "inferred") and i.reference_answer
 
 
 def test_gold_validation_catches_mistakes():

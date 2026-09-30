@@ -69,6 +69,47 @@ def write_report(path: Path, items: list[GoldItem], preds: dict[str, dict], m: d
         for g, members in c["detail"].items():
             L.append(f"| {g} | " + ", ".join(f"{i}: {v}" for i, v in members.items()) + " |")
 
+    w = m.get("walert")
+    if w:
+        L.append("\n## Walert-comparable measures\n")
+        L.append("Same measures as Walert (Pathiyan Cherumanal et al., CHIIR 2024), so results can be set beside "
+                 "theirs. NDCG uses graded relevance: `expected_sections` = 2 (highly relevant), "
+                 "`partial_sections` = 1 (partially relevant).\n")
+        L.append("| Measure | Value | n |\n|---|---|---|")
+        L.append(f"| % unanswered, out-of-knowledge-base questions | {_fmt(w.get('pct_unanswered_out_of_kb'))} "
+                 f"| {w.get('out_of_kb_n')} |")
+        L.append(f"| % unanswered, underspecified scenarios | {_fmt(w.get('pct_unanswered_underspecified'))} "
+                 f"| {w.get('underspecified_n')} |")
+        for cat, vals in w.get("ndcg", {}).items():
+            for cut, v in vals.items():
+                if cut != "n":
+                    L.append(f"| NDCG{cut} ({cat} questions) | {_fmt(v)} | {vals['n']} |")
+        r1 = w.get("rouge1") or {}
+        L.append(f"| ROUGE-1 F1 vs reference answers{' (stemmed)' if r1.get('stemmer') else ''} "
+                 f"| {_fmt(r1.get('f1'))} | {r1.get('n')} |")
+        bs = w.get("bertscore")
+        bs_info = run.get("bertscore") or {}
+        L.append(f"| BERTScore F1 ({bs_info.get('model', 'n/a')}) | {_fmt((bs or {}).get('f1'))} | "
+                 f"{(bs or {}).get('n', 0)} |")
+        if not bs:
+            L.append(f"\n_BERTScore: {bs_info.get('status', 'not computed')}._")
+
+    f = m.get("fairness")
+    if f and f.get("groups"):
+        L.append(f"\n## Counterfactual fairness ({f['groups']} groups, {f['variants']} variants)\n")
+        L.append("Each variant changes only a customer's name or country of birth (or, for foreign PEPs, which "
+                 "foreign country). The tier should never change.\n")
+        L.append(f"- Invariance rate (groups with identical answers): **{_fmt(f['invariance_rate'])}**")
+        L.append(f"- Tier flip rate (variants whose tier differs from the base): **{_fmt(f['tier_flip_rate'])}**")
+        L.append(f"- Confidence flip rate: {_fmt(f['confidence_flip_rate'])}")
+        L.append(f"- Variant accuracy (acceptable tier): {_fmt(f['variant_accuracy'])}\n")
+        L.append("| Base | Predictions |\n|---|---|")
+        for base, members in f["detail"].items():
+            L.append(f"| {base} | " + ", ".join(f"{i}: {v}" for i, v in members.items()) + " |")
+        if f["flips"]:
+            L.append("\n**Flips:** " + "; ".join(f"{x['id']} gave {x['tier']} where {x['base']} gave "
+                                                  f"{x['base_tier']}" for x in f["flips"]))
+
     L.append("\n## Failures\n")
     by_id = {i.id: i for i in items}
     fails = []
@@ -118,8 +159,10 @@ def write_report(path: Path, items: list[GoldItem], preds: dict[str, dict], m: d
 def write_comparison(path: Path, results: dict[str, dict[str, Any]]) -> None:
     presets = list(results)
     keys = list(next(iter(results.values()))["headline"].keys())
-    L = ["# Ablation comparison\n", "Each preset adds one component: baseline (dense only) → hybrid (+BM25) → "
-         "hybrid_facts (+fact extraction sub-queries) → full (+guardrails).\n",
+    L = ["# Ablation comparison\n", "closed_book is the model on its own, with no retrieval: the gap between it "
+         "and the other columns is what RAG adds. Each later preset adds one component: baseline (dense retrieval) → "
+         "hybrid (+BM25) → hybrid_facts (+fact extraction sub-queries) → full (+guardrails). For closed_book, "
+         "retrieval and faithfulness do not apply, and citation validity means the named section exists.\n",
          "| Metric | " + " | ".join(presets) + " |", "|---|" + "---|" * len(presets)]
     for k in keys:
         L.append(f"| {k} | " + " | ".join(_fmt(results[p]["headline"].get(k)) for p in presets) + " |")

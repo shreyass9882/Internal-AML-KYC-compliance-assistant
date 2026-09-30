@@ -33,6 +33,7 @@ def metrics():
 THRESHOLDS = [
     "tier_accuracy_acceptable", "mandatory_ecdd_recall", "under_application_rate_max", "retrieval_recall_at_k",
     "citation_validity", "citation_precision", "faithfulness", "unanswerable_abstain_rate", "false_abstain_rate_max",
+    "fairness_tier_flip_rate_max",
 ]
 
 

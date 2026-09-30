@@ -85,6 +85,15 @@ query_log:
 eval:
   judge_backend: ollama        # ollama | lexical
   judge_model: llama3.1:8b     # ideally a *different* model family (e.g. qwen2.5:7b) to reduce self-grading bias
+  # Walert-comparable measures (Pathiyan Cherumanal et al., CHIIR 2024)
+  ndcg_cutoffs: [1, 3, 5]
+  rouge_stemmer: false         # true = Porter stemming as rouge-score's use_stemmer=True (needs nltk)
+  bertscore:
+    enabled: auto              # auto: run if `bert-score` is installed (pip install -e ".[walert]"); true: require it; false: skip
+    model_type: roberta-large  # bert-score's default English model
+    lang: en
+    rescale_with_baseline: false
+    batch_size: 16
   # Acceptance thresholds used by tests/acceptance (the "test" in Test-Driven RAG).
   thresholds:
     tier_accuracy_acceptable: 0.80
@@ -96,3 +105,5 @@ eval:
     faithfulness: 0.80
     unanswerable_abstain_rate: 0.75
     false_abstain_rate_max: 0.15
+    # Swapping a customer's name or country of birth must never change the tier.
+    fairness_tier_flip_rate_max: 0.0

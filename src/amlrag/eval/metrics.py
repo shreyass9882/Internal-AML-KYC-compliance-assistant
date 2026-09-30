@@ -1,12 +1,19 @@
-"""Evaluation metrics: effectiveness, retrieval, attribution, faithfulness, abstention, consistency."""
+"""Evaluation metrics: effectiveness, retrieval, attribution, faithfulness, abstention, consistency,
+Walert-comparable measures (graded NDCG, ROUGE-1, BERTScore, % unanswered) and counterfactual fairness.
+
+Counterfactual variants (gold items with counterfactual_of set) only feed the fairness block, so each
+scenario counts once in every other metric.
+"""
 from __future__ import annotations
 
+import math
 import statistics
 from collections import Counter, defaultdict
 from typing import Any
 
 from amlrag import ABSTAIN, TIER_ORDER, TIERS
 from amlrag.eval.gold import GoldItem
+from amlrag.eval.textmetrics import rouge1
 from amlrag.models import ref_matches
 
 
@@ -31,6 +38,29 @@ def key_fact_recall(answer_text: str, key_facts: list[list[str]]) -> float | Non
     return hits / len(key_facts)
 
 
+def ndcg_at(retrieved: list[str], grades: dict[str, int], k: int) -> float | None:
+    """Graded NDCG@k with linear gain, crediting each gold reference at most once.
+
+    A reference can be a whole document, so several chunks may match it; only the first
+    one earns its grade. The ideal ranking places every reference once, best grade first.
+    """
+    if not grades:
+        return None
+    credited: set[str] = set()
+    dcg = 0.0
+    for rank, cid in enumerate(retrieved[:k], start=1):
+        best, best_grade = None, 0
+        for ref, grade in grades.items():
+            if ref not in credited and grade > best_grade and ref_matches(cid, ref):
+                best, best_grade = ref, grade
+        if best is not None:
+            credited.add(best)
+            dcg += best_grade / math.log2(rank + 1)
+    ideal = sorted(grades.values(), reverse=True)[:k]
+    idcg = sum(g / math.log2(i + 1) for i, g in enumerate(ideal, start=1))
+    return dcg / idcg if idcg else None
+
+
 def _percentile(xs: list[float], q: float) -> float | None:
     if not xs:
         return None
@@ -40,10 +70,11 @@ def _percentile(xs: list[float], q: float) -> float | None:
 
 
 def compute_metrics(items: list[GoldItem], preds: dict[str, dict[str, Any]], available_docs: set[str],
-                    k: int) -> dict[str, Any]:
+                    k: int, ndcg_cutoffs: tuple[int, ...] = (1, 3, 5), rouge_stemmer: bool = False) -> dict[str, Any]:
     by_id = {i.id: i for i in items}
-    pairs = [(by_id[pid], p) for pid, p in preds.items() if pid in by_id]
-    m: dict[str, Any] = {"n_items": len(pairs), "k": k}
+    all_pairs = [(by_id[pid], p) for pid, p in preds.items() if pid in by_id]
+    pairs = [(g, p) for g, p in all_pairs if not g.is_variant]
+    m: dict[str, Any] = {"n_items": len(pairs), "n_counterfactual_variants": len(all_pairs) - len(pairs), "k": k}
 
     # ------------------------------------------------------------ tier effectiveness
     det = [(g, p) for g, p in pairs if g.mode == "determine" and g.answerable]
@@ -172,8 +203,80 @@ def compute_metrics(items: list[GoldItem], preds: dict[str, dict[str, Any]], ava
     m["errors"] = [pid for pid, p in preds.items() if p.get("error")]
     m["needs_review_rate"] = _mean([float(bool(p.get("needs_review"))) for _, p in pairs])
 
+    m["walert"] = _walert(pairs, ans, available_docs, ndcg_cutoffs, rouge_stemmer)
+    m["fairness"] = _fairness(all_pairs, by_id)
     m["headline"] = headline(m)
     return m
+
+
+def _walert(pairs, ans, available_docs, cutoffs, stemmer) -> dict[str, Any]:
+    """Measures reported by Walert (Pathiyan Cherumanal et al., CHIIR 2024), for comparison."""
+    out: dict[str, Any] = {}
+    for cat in ("out_of_kb", "underspecified"):
+        members = [p for g, p in pairs if g.category == cat]
+        out[f"{cat}_n"] = len(members)
+        out[f"pct_unanswered_{cat}"] = _mean([float(bool(p.get("abstained"))) for p in members])
+
+    ndcg: dict[str, dict[str, Any]] = {}
+    buckets: dict[str, dict[int, list[float]]] = defaultdict(lambda: defaultdict(list))
+    for g, p in ans:
+        if p.get("closed_book"):
+            continue
+        grades = {r: v for r, v in g.relevance().items() if _doc_of(r) in available_docs}
+        if not grades:
+            continue
+        for c in cutoffs:
+            val = ndcg_at(p.get("retrieved", []), grades, c)
+            if val is not None:
+                buckets[g.category][c].append(val)
+                buckets["all"][c].append(val)
+    for cat in ("known", "inferred", "all"):
+        if cat in buckets:
+            ndcg[cat] = {f"@{c}": _mean(buckets[cat][c]) for c in cutoffs}
+            ndcg[cat]["n"] = len(buckets[cat][cutoffs[0]])
+    out["ndcg"] = ndcg
+
+    scored = [(g, p) for g, p in ans if g.reference_answer]
+    r1 = [rouge1(p.get("answer_text", ""), g.reference_answer, stemmer) for g, p in scored]
+    out["rouge1"] = {"n": len(r1), **{k: _mean([x[k] for x in r1]) for k in ("precision", "recall", "f1")},
+                     "stemmer": stemmer}
+    bs = [p["bertscore"] for _, p in scored if p.get("bertscore")]
+    out["bertscore"] = ({"n": len(bs), **{k: _mean([x[k] for x in bs]) for k in ("precision", "recall", "f1")}}
+                        if bs else None)
+    return out
+
+
+def _fairness(all_pairs, by_id) -> dict[str, Any]:
+    """Counterfactual invariance: swapping a name or country of birth must not change the answer."""
+    preds = {g.id: p for g, p in all_pairs}
+    groups: dict[str, list[tuple[GoldItem, dict]]] = defaultdict(list)
+    for g, p in all_pairs:
+        if g.is_variant:
+            groups[g.counterfactual_of].append((g, p))
+    invariant, flips, conf_flips, variant_ok, flip_list, detail = [], [], [], [], [], {}
+    for base_id, variants in sorted(groups.items()):
+        base = by_id.get(base_id)
+        base_pred = preds.get(base_id)
+        if base is None or base_pred is None:
+            continue                            # base filtered out of this run (e.g. --ids)
+        base_tier = base_pred.get("tier") if base.mode == "determine" else bool(base_pred.get("abstained"))
+        tiers = [base_tier]
+        for g, p in variants:
+            tier = p.get("tier") if g.mode == "determine" else bool(p.get("abstained"))
+            tiers.append(tier)
+            flipped = tier != base_tier
+            flips.append(float(flipped))
+            conf_flips.append(float(p.get("confidence") != base_pred.get("confidence")))
+            if g.mode == "determine":
+                variant_ok.append(float((tier or ABSTAIN) in g.acceptable))
+            if flipped:
+                flip_list.append({"id": g.id, "base": base_id, "base_tier": base_tier, "tier": tier})
+        invariant.append(float(len(set(map(str, tiers))) == 1))
+        detail[base_id] = {base_id: base_tier, **{g.id: (p.get("tier") if g.mode == "determine"
+                                                         else bool(p.get("abstained"))) for g, p in variants}}
+    return {"groups": len(invariant), "variants": len(flips), "invariance_rate": _mean(invariant),
+            "tier_flip_rate": _mean(flips), "confidence_flip_rate": _mean(conf_flips),
+            "variant_accuracy": _mean(variant_ok), "flips": flip_list, "detail": detail}
 
 
 def _macro_f1(det: list[tuple[GoldItem, dict]]) -> float | None:
@@ -212,6 +315,12 @@ def headline(m: dict[str, Any]) -> dict[str, Any]:
         "unanswerable_abstain_rate": m["abstention"]["unanswerable_abstain_rate"],
         "false_abstain_rate": m["abstention"]["false_abstain_rate"],
         "consistency_agreement": m["consistency"]["agreement_rate"],
+        "fairness_invariance": m["fairness"]["invariance_rate"],
+        "fairness_tier_flip_rate": m["fairness"]["tier_flip_rate"],
+        "walert_pct_unanswered_out_of_kb": m["walert"]["pct_unanswered_out_of_kb"],
+        "walert_ndcg_at_5": (m["walert"]["ndcg"].get("all") or {}).get("@5"),
+        "walert_rouge1_f1": m["walert"]["rouge1"]["f1"],
+        "walert_bertscore_f1": (m["walert"]["bertscore"] or {}).get("f1"),
         "latency_p50_s": m["latency_s"]["p50"],
         "latency_p95_s": m["latency_s"]["p95"],
     }
@@ -228,6 +337,7 @@ THRESHOLD_KEYS = {
     "faithfulness": ("faithfulness", "min"),
     "unanswerable_abstain_rate": ("unanswerable_abstain_rate", "min"),
     "false_abstain_rate_max": ("false_abstain_rate", "max"),
+    "fairness_tier_flip_rate_max": ("fairness_tier_flip_rate", "max"),
 }
 
 

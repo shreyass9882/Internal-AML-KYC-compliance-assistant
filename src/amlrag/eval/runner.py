@@ -16,6 +16,7 @@ from amlrag.eval.gold import GoldItem, load_gold
 from amlrag.eval.judge import Judge
 from amlrag.eval.metrics import check_thresholds, compute_metrics
 from amlrag.eval.report import write_comparison, write_report
+from amlrag.eval.textmetrics import bertscore, bertscore_available, bertscore_settings
 from amlrag.pipeline import Assistant
 
 log = logging.getLogger(__name__)
@@ -73,15 +74,50 @@ def _prediction(item: GoldItem, result: dict[str, Any], judge: Judge | None, chu
     }
 
 
-def run_eval(cfg: Config, preset: str = "full", gold_path: str | None = None, limit: int | None = None,
-             ids: list[str] | None = None, out_dir: Path | None = None, verbose: bool = True,
-             llm=None) -> tuple[Path, dict[str, Any]]:
-    cfg = apply_preset(cfg, preset)
-    items = load_gold(gold_path or cfg.path("gold_file"))
+def _select(items: list[GoldItem], ids, tags, limit) -> list[GoldItem]:
     if ids:
         items = [i for i in items if i.id in ids]
+    if tags:
+        wanted = set(tags)
+        items = [i for i in items if wanted & set(i.tags)]
+        # Keep the base of every selected counterfactual so invariance can be measured.
+        chosen = {i.id for i in items}
+        bases = {i.counterfactual_of for i in items if i.counterfactual_of} - chosen
+        items = items + [i for i in _ALL_ITEMS.get("items", []) if i.id in bases]
     if limit:
         items = items[:limit]
+    return items
+
+
+_ALL_ITEMS: dict[str, list[GoldItem]] = {}
+
+
+def _add_bertscore(cfg: Config, items: list[GoldItem], preds: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    settings = bertscore_settings(cfg.eval)
+    info = {"model": settings["model_type"], "rescale_with_baseline": settings["rescale_with_baseline"]}
+    if settings["enabled"] in ("false", "off", "no"):
+        return {**info, "status": "disabled"}
+    if not bertscore_available():
+        if settings["enabled"] in ("true", "on", "yes"):
+            raise RuntimeError('eval.bertscore.enabled is true but bert-score is not installed: '
+                               'pip install -e ".[walert]"')
+        return {**info, "status": "skipped (bert-score not installed)"}
+    scored = [i for i in items if i.answerable and i.reference_answer and i.id in preds]
+    scores = bertscore([preds[i.id].get("answer_text", "") for i in scored], [i.reference_answer for i in scored],
+                       settings["model_type"], settings["lang"], settings["rescale_with_baseline"],
+                       settings["batch_size"])
+    for item, sc in zip(scored, scores):
+        preds[item.id]["bertscore"] = {k: round(v, 4) for k, v in sc.items()}
+    return {**info, "status": f"computed for {len(scores)} answers"}
+
+
+def run_eval(cfg: Config, preset: str = "full", gold_path: str | None = None, limit: int | None = None,
+             ids: list[str] | None = None, out_dir: Path | None = None, verbose: bool = True,
+             llm=None, tags: list[str] | None = None) -> tuple[Path, dict[str, Any]]:
+    cfg = apply_preset(cfg, preset)
+    all_items = load_gold(gold_path or cfg.path("gold_file"))
+    _ALL_ITEMS["items"] = all_items
+    items = _select(all_items, ids, tags, limit)
     assistant = Assistant.from_config(cfg, llm=llm)
     chunk_text = {cid: c.text for cid, c in assistant.retriever.chunks.items()}
     available_docs = {c.doc_id for c in assistant.retriever.chunks.values()}
@@ -114,13 +150,21 @@ def run_eval(cfg: Config, preset: str = "full", gold_path: str | None = None, li
     if judge:
         judge.save()
 
-    metrics = compute_metrics(items, preds, available_docs, cfg.retrieval.final_k)
+    bert_info = _add_bertscore(cfg, items, preds)
+    if bert_info["status"].startswith("computed"):          # rewrite with the scores included
+        with open(out_dir / "predictions.jsonl", "w", encoding="utf-8") as fh:
+            for pred in preds.values():
+                fh.write(json.dumps(pred, ensure_ascii=False) + "\n")
+
+    metrics = compute_metrics(items, preds, available_docs, cfg.retrieval.final_k,
+                              tuple(cfg.eval.get("ndcg_cutoffs", [1, 3, 5])),
+                              bool(cfg.eval.get("rouge_stemmer", False)))
     metrics["acceptance"] = check_thresholds(metrics["headline"], cfg.eval.thresholds.to_dict())
     metrics["run"] = {
         "preset": preset, "started": stamp, "duration_s": round(time.perf_counter() - t0, 1),
         "gold_file": str(gold_path or cfg.path("gold_file")), "n_items": len(items),
         "generator": getattr(assistant.llm, "name", "?"), "embedder": assistant.embedder_name,
-        "judge": judge.name if judge else "lexical", "snapshot": assistant.snapshot,
+        "judge": judge.name if judge else "lexical", "snapshot": assistant.snapshot, "bertscore": bert_info,
         "index_digest": assistant.retriever.store.manifest.get("chunks_digest"),
         "gold_status": {s: sum(i.status == s for i in items) for s in ("draft", "reviewed")},
         "finished": datetime.now(timezone.utc).isoformat(timespec="seconds"),

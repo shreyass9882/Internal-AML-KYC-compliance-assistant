@@ -117,10 +117,11 @@ def cmd_eval(args) -> int:
     if args.judge:
         cfg = cfg.override("eval.judge_backend", args.judge)
     if args.preset == "all":
-        base = run_all_presets(cfg, gold_path=args.gold, limit=args.limit, ids=args.ids)
+        base = run_all_presets(cfg, gold_path=args.gold, limit=args.limit, ids=args.ids, tags=args.tags)
         print(f"\nAblation comparison: {base / 'comparison.md'}")
         return 0
-    out_dir, metrics = run_eval(cfg, preset=args.preset, gold_path=args.gold, limit=args.limit, ids=args.ids)
+    out_dir, metrics = run_eval(cfg, preset=args.preset, gold_path=args.gold, limit=args.limit, ids=args.ids,
+                                tags=args.tags)
     print(f"\n[{args.preset}] results in {out_dir}")
     for k, v in metrics.get("headline", {}).items():
         print(f"  {k:<32} {v}")
@@ -238,6 +239,7 @@ def main(argv: list[str] | None = None) -> None:
                     help="full | closed_book | baseline | hybrid | hybrid_facts | all (runs every preset)")
     sp.add_argument("--limit", type=int)
     sp.add_argument("--ids", nargs="+")
+    sp.add_argument("--tags", nargs="+", help="only items with any of these tags, e.g. fairness trap")
     sp.add_argument("--judge", choices=["ollama", "lexical"])
     sp.add_argument("--fast", action="store_true")
 
