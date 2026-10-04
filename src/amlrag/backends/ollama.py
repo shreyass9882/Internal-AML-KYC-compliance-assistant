@@ -144,7 +144,8 @@ class OllamaLLM:
         self.options = {"temperature": temperature, "seed": seed, "num_ctx": num_ctx, "num_predict": num_predict}
         self.think = think
         self._send_think = think is not None
-        self.name = f"ollama:{model}"
+        # Reports and comparisons label runs by this name, so a thinking run is visibly different.
+        self.name = f"ollama:{model}" + ("" if not think else "+think" if think is True else f"+think-{think}")
 
     def _chat(self, payload: dict[str, Any]) -> dict[str, Any]:
         if self._send_think:

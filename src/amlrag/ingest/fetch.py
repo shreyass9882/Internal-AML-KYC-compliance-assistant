@@ -38,6 +38,7 @@ class SourceDoc:
     section_label: str = "s"
     section_pattern: str | None = None
     include_parts: list[str] | None = None
+    include_sections: list[str] | None = None
     optional: bool = False
     discovered: bool = False
 
@@ -52,6 +53,7 @@ class SourceDoc:
             section_label=d.get("section_label", "s"),
             section_pattern=d.get("section_pattern"),
             include_parts=[str(p) for p in d.get("include_parts", [])] or None,
+            include_sections=[str(x) for x in d.get("include_sections", [])] or None,
             optional=bool(d.get("optional", False)),
             discovered=bool(d.get("discovered", False)),
         )

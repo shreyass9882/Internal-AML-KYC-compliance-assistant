@@ -20,3 +20,5 @@ kb/manual/*.pdf
 kb/manual/*.html
 
 .DS_Store
+AML Document.pdf
+logs/*.log

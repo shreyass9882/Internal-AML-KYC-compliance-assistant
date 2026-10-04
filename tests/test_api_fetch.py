@@ -109,3 +109,23 @@ def test_fetch_crawl_lock_and_change_detection(tmp_path):
         assert fetch_snapshot(cfg, refresh=True)["changed"] == ["austrac-child"]
     finally:
         httpd.shutdown()
+
+
+def test_sign_in_and_manager_only_gaps(built_cfg, tmp_path):
+    from amlrag.server.app import create_app
+
+    cfg = (built_cfg.override("paths.query_log", str(tmp_path / "q.db"))
+           .override("server.password", "team-pw").override("server.manager_password", "boss-pw"))
+    c = TestClient(create_app(cfg))
+    r = c.get("/")
+    assert r.status_code == 401 and r.headers["www-authenticate"].startswith("Basic")
+    assert c.get("/api/health", auth=("cdd", "wrong")).status_code == 401
+    assert c.get("/api/health", auth=("someone", "team-pw")).status_code == 401
+    assert c.get("/api/health", auth=("cdd", "team-pw")).status_code == 200
+    assert c.get("/api/gaps", auth=("cdd", "team-pw")).status_code == 403
+    assert c.get("/api/gaps", auth=("manager", "boss-pw")).status_code == 200
+    assert c.post("/api/explain", auth=("manager", "boss-pw"), json={"text": "What KYC for individuals?"}).status_code == 200
+
+
+def test_no_password_means_no_sign_in(client):
+    assert client.get("/api/health").status_code == 200

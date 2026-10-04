@@ -125,6 +125,11 @@ def test_think_false_is_sent_by_default(server):
     assert FakeOllama.requests[-1][1]["think"] is False
 
 
+def test_thinking_runs_are_named_differently(server):
+    assert OllamaLLM(OllamaClient(server), "qwen3.5:9b").name == "ollama:qwen3.5:9b"
+    assert OllamaLLM(OllamaClient(server), "qwen3.5:9b", think=True).name == "ollama:qwen3.5:9b+think"
+
+
 def test_think_none_leaves_model_default(server):
     OllamaLLM(OllamaClient(server), "qwen3.5:9b", think=None).chat_json([{"role": "user", "content": "x"}])
     assert "think" not in FakeOllama.requests[-1][1]

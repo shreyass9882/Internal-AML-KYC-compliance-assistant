@@ -27,25 +27,30 @@ documents:
     title: Anti-Money Laundering and Counter-Terrorism Financing Rules 2025
     short: AML/CTF Rules 2025
     kind: legislation
-    # As-made version (29 Aug 2025). The 2026 amendment rules (F2026L00353)
-    # changed parts of the text (e.g. rule 6-18): for the final snapshot use the
-    # latest compilation (Compilation No. 1, 31 Mar 2026 at the time of writing)
-    # from https://www.legislation.gov.au/F2025L01026/latest and save it as
-    # kb/manual/rules2025.pdf, or a text export of it as kb/manual/rules2025.txt
-    # (the text export of Compilation No. 1 has been checked against the parser).
-    url: https://www.legislation.gov.au/F2025L01026/asmade/2025-08-29/text/original/pdf
+    # Version-locked to Compilation No. 1 (F2026C00274, compilation date 31 Mar 2026),
+    # which includes the 2026 amendment rules (F2026L00353, e.g. rule 6-18's relief moved
+    # to 6-7(1A)). Cited sources link to this exact version, not "latest", so citations
+    # stay valid after the Rules are amended again. `amlrag fetch` downloads this PDF
+    # unless kb/manual/rules2025.pdf (or a text export, rules2025.txt) is present.
+    # Both formats have been checked against the parser (52 sections with 5-5, 72 chunks).
+    # When a new compilation is registered: update this URL and the file, then rebuild.
+    url: https://www.legislation.gov.au/F2025L01026/2026-03-31/2026-03-31/text/original/pdf
     section_label: "s"
     # Rules sections are numbered "<part>-<section>", e.g. "6-23".
     section_pattern: '^(\d{1,2}-\d{1,3}[A-Z]?)\s+([A-Z][^\n]{2,160})$'
     include_parts: ["1", "6"]      # Part 1 = definitions/preliminary, Part 6 = CDD
+    # Single sections from other Parts that CDD answers depend on:
+    #   5-5 senior manager approval before serving a foreign PEP (or a high-risk domestic /
+    #       international organisation PEP) and before a nested services relationship.
+    include_sections: ["5-5"]
 
   - id: amlctf-act
     title: Anti-Money Laundering and Counter-Terrorism Financing Act 2006
     short: AML/CTF Act
     kind: legislation
     optional: true
-    # Download the latest compilation PDF (C2004A01550) from
-    # https://www.legislation.gov.au/C2004A01550/latest and save it as
+    # Download the compilation PDF (C2006A00169) from
+    # https://www.legislation.gov.au/C2006A00169/latest/downloads and save it as
     # kb/manual/amlctf-act.pdf. Sections 28-32 (initial, delayed, ongoing,
     # simplified, enhanced CDD) are the ones the tier logic rests on.
     url: null
@@ -139,7 +144,10 @@ documents:
 # "austrac-<last-url-segment>" and are written to the lock file, so they are
 # version-locked like everything else. Review the lock file after first fetch.
 crawl:
-  enabled: true
+  # Off by default: in testing (Sept 2026) austrac.gov.au timed out automated requests, so
+  # the pages above were saved from a browser into kb/manual/<id>.html instead. Turn on
+  # to discover in-scope sub-pages when the site answers the fetcher.
+  enabled: false
   seeds:
     - https://www.austrac.gov.au/industry-and-business/obligations-and-guidance/your-amlctf-program/customer-due-diligence
   allow_prefixes:

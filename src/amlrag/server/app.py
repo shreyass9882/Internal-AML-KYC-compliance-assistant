@@ -1,13 +1,15 @@
 """FastAPI server: JSON API + a static single-page UI."""
 from __future__ import annotations
 
+import base64
 import logging
+import secrets
 import threading
 from pathlib import Path
 from typing import Any, Literal
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -46,8 +48,56 @@ class FeedbackRequest(BaseModel):
     value: Literal["helpful", "not_helpful"]
 
 
+def _basic_credentials(request: Request) -> tuple[str, str] | None:
+    header = request.headers.get("authorization", "")
+    if not header.lower().startswith("basic "):
+        return None
+    try:
+        user, _, password = base64.b64decode(header[6:]).decode("utf-8").partition(":")
+    except Exception:
+        return None
+    return user, password
+
+
+def _same(a: str, b: str) -> bool:
+    return secrets.compare_digest(a.encode("utf-8"), b.encode("utf-8"))
+
+
+def access_settings(cfg: Config) -> dict[str, str | None]:
+    """server.username / password / manager_password (set the passwords with environment variables)."""
+    srv = cfg.get("server", {})
+    return {"username": str(srv.get("username") or "cdd"),
+            "password": str(srv.get("password")) if srv.get("password") else None,
+            "manager_password": str(srv.get("manager_password")) if srv.get("manager_password") else None}
+
+
+def _add_sign_in(app: FastAPI, access: dict[str, str | None]) -> None:
+    """HTTP Basic sign-in for the whole app; Review gaps can be limited to a "manager" sign-in.
+
+    Needed before the app is reachable beyond this computer (e.g. through a tunnel): without it,
+    anyone with the address could use the models and read the Review gaps log.
+    """
+    user_pw, mgr_pw, username = access["password"], access["manager_password"], access["username"]
+
+    @app.middleware("http")
+    async def require_sign_in(request: Request, call_next):
+        creds = _basic_credentials(request)
+        is_manager = bool(mgr_pw and creds and creds[0] == "manager" and _same(creds[1], mgr_pw))
+        is_user = is_manager or bool(user_pw and creds and creds[0] == username and _same(creds[1], user_pw))
+        if not is_user:
+            return Response("Sign in to use the CDD Assistant.", status_code=401,
+                            headers={"WWW-Authenticate": 'Basic realm="CDD Assistant", charset="UTF-8"'})
+        if request.url.path.startswith("/api/gaps") and mgr_pw and not is_manager:
+            return JSONResponse({"detail": 'Review gaps is for managers. Sign in as "manager" with the manager '
+                                           "password (open a private window to switch user)."}, status_code=403)
+        return await call_next(request)
+
+
 def create_app(cfg: Config, assistant=None) -> FastAPI:
     app = FastAPI(title="AML/CTF CDD Compliance Assistant", version="0.1.0")
+    access = access_settings(cfg)
+    if access["password"] or access["manager_password"]:
+        _add_sign_in(app, access)
     qlog = QueryLog.from_config(cfg)
     state: dict[str, Any] = {"assistant": assistant, "error": None}
     lock = threading.Lock()

@@ -1,4 +1,4 @@
-"""Command-line interface: amlrag fetch | build | ask | eval | compare | serve | doctor | log | stats."""
+"""Command-line interface: amlrag fetch | build | ask | eval | rescore | compare | serve | doctor | log | stats."""
 from __future__ import annotations
 
 import argparse
@@ -8,6 +8,10 @@ import sys
 import textwrap
 
 from amlrag.config import load_config
+
+
+THINK_NUM_PREDICT = 4096
+THINK_NUM_CTX = 12288
 
 
 def _cfg(args):
@@ -23,6 +27,11 @@ def _cfg(args):
         cfg = cfg.override("generation.model", cfg.generation.fallback_model)
     if getattr(args, "closed_book", False):
         cfg = cfg.override("retrieval.enabled", False)
+    if getattr(args, "think", False):
+        # Thinking tokens count towards num_predict and the context window, so both need room.
+        cfg = cfg.override("generation.think", True) \
+                 .override("generation.num_predict", max(int(cfg.generation.num_predict), THINK_NUM_PREDICT)) \
+                 .override("generation.num_ctx", max(int(cfg.generation.num_ctx), THINK_NUM_CTX))
     return cfg
 
 
@@ -129,7 +138,7 @@ def cmd_eval(args) -> int:
     print(f"\n[{args.preset}] results in {out_dir}")
     for k, v in metrics.get("headline", {}).items():
         print(f"  {k:<32} {v}")
-    failed = [a["name"] for a in metrics.get("acceptance", []) if not a["passed"]]
+    failed = [a["name"] for a in metrics.get("acceptance", []) if a["passed"] is False]
     print("\nAcceptance: " + ("all thresholds met" if not failed else "FAILED " + ", ".join(failed)))
     return 0
 
@@ -139,7 +148,16 @@ def cmd_serve(args) -> int:
 
     from amlrag.server.app import create_app
 
+    from amlrag.server.app import access_settings
+
     cfg = _cfg(args)
+    access = access_settings(cfg)
+    if access["password"]:
+        print(f"Sign-in required: user '{access['username']}'"
+              + (", and 'manager' for Review gaps" if access["manager_password"] else ""))
+    else:
+        print("No password set: anyone who can reach this address can use the app. Before sharing it beyond "
+              "this computer, set AMLRAG_SERVER__PASSWORD (see README, 'Sharing the app').")
     uvicorn.run(create_app(cfg), host=args.host, port=args.port, log_level="info")
     return 0
 
@@ -225,6 +243,21 @@ def cmd_compare(args) -> int:
     return 0
 
 
+def cmd_rescore(args) -> int:
+    from pathlib import Path
+
+    from amlrag.eval.runner import rescore_run
+
+    cfg = _cfg(args)
+    out_dir, metrics = rescore_run(cfg, Path(args.run), args.gold)
+    print(f"Rescored {args.run} against the current gold set: {out_dir}")
+    for k, v in metrics["headline"].items():
+        print(f"  {k:<32} {v}")
+    failed = [a["name"] for a in metrics["acceptance"] if a["passed"] is False]
+    print("\nAcceptance: " + ("all thresholds met" if not failed else "FAILED " + ", ".join(failed)))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(prog="amlrag", description=__doc__)
     p.add_argument("--config", help="path to config.yaml (default: nearest config.yaml)")
@@ -252,6 +285,8 @@ def main(argv: list[str] | None = None) -> None:
     sp.add_argument("--json", action="store_true")
     sp.add_argument("--fast", action="store_true", help="use generation.fallback_model")
     sp.add_argument("--model", help="answer model for this run, e.g. llama3.1:8b (overrides config.yaml)")
+    sp.add_argument("--think", action="store_true",
+                    help="let the answer model reason before answering (slower; an experiment, not the default)")
     sp.add_argument("--embedding-model", help="embedding model (its index must be built), e.g. nomic-embed-text")
     sp.add_argument("--closed-book", action="store_true",
                     help="answer with no retrieval (the baseline RAG is compared against)")
@@ -266,17 +301,25 @@ def main(argv: list[str] | None = None) -> None:
     sp.add_argument("--judge", choices=["ollama", "lexical"])
     sp.add_argument("--fast", action="store_true")
     sp.add_argument("--model", help="answer model for this run, e.g. llama3.1:8b (overrides config.yaml)")
+    sp.add_argument("--think", action="store_true",
+                    help="let the answer model reason before answering (slower; an experiment, not the default)")
     sp.add_argument("--embedding-model", help="embedding model (its index must be built), e.g. nomic-embed-text")
 
     sp = add("compare", cmd_compare, "side-by-side table of finished eval runs (e.g. two models)")
     sp.add_argument("runs", nargs="+", help="results/<run> folders")
     sp.add_argument("--out", help="output Markdown file (default results/comparison-<time>.md)")
 
+    sp = add("rescore", cmd_rescore, "score a finished run's saved answers again against the current gold set")
+    sp.add_argument("run", help="results/<run> folder")
+    sp.add_argument("--gold", help="gold JSONL (default paths.gold_file)")
+
     sp = add("serve", cmd_serve, "start the web UI + API")
     sp.add_argument("--host", default="127.0.0.1")
     sp.add_argument("--port", type=int, default=8000)
     sp.add_argument("--fast", action="store_true")
     sp.add_argument("--model", help="answer model for this run, e.g. llama3.1:8b (overrides config.yaml)")
+    sp.add_argument("--think", action="store_true",
+                    help="let the answer model reason before answering (slower; an experiment, not the default)")
     sp.add_argument("--embedding-model", help="embedding model (its index must be built), e.g. nomic-embed-text")
 
     sp = add("doctor", cmd_doctor, "check Ollama, models, snapshot and index")

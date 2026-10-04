@@ -151,22 +151,35 @@ def compute_metrics(items: list[GoldItem], preds: dict[str, dict[str, Any]], ava
         "citation_precision_document": _mean(c_prec_doc),
         "citation_recall_section": _mean(c_rec),
         "answers_with_uncited_points": sum(1 for _, p in pairs if p.get("checks", {}).get("uncited_points")),
+        # Prompt v3.2: an answer that lists as missing, or calls unstated, a fact the scenario denies.
+        "answers_calling_ruled_out_fact_unknown": sum(1 for _, p in pairs
+                                                       if p.get("checks", {}).get("ruled_out_called_unknown")),
     }
 
     # ------------------------------------------------------------ faithfulness
     judged, lexical = [], []
+    by_kind: dict[str, dict[str, list[float]]] = defaultdict(lambda: {"judge": [], "lexical": []})
     for _, p in pairs:
         if p.get("abstained"):
             continue
         for pt in p.get("points", []):
+            # Reasoning points carry a kind from prompt version 2; earlier runs fall back to the group.
+            kind = pt.get("kind") or pt.get("group") or "point"
             if pt.get("supported_lexical") is not None:
                 lexical.append(float(bool(pt["supported_lexical"])))
+                by_kind[kind]["lexical"].append(float(bool(pt["supported_lexical"])))
             if pt.get("judge_supported") is not None:
                 judged.append(float(bool(pt["judge_supported"])))
+                by_kind[kind]["judge"].append(float(bool(pt["judge_supported"])))
+    source_claims = [v for k, d in by_kind.items() if k != "scenario_fact" for v in d["judge"]]
     m["faithfulness"] = {
         "points": len(lexical),
         "judge_supported_rate": _mean(judged),
         "lexical_supported_rate": _mean(lexical),
+        # Claims that must come from a source (everything except facts restated from the scenario).
+        "source_claims_judge_rate": _mean(source_claims),
+        "by_kind": {k: {"n": len(d["lexical"]), "judge_supported_rate": _mean(d["judge"]),
+                        "lexical_supported_rate": _mean(d["lexical"])} for k, d in sorted(by_kind.items())},
         "judge": preds and next(iter(preds.values())).get("judge_name"),
     }
 
@@ -346,7 +359,8 @@ def check_thresholds(head: dict[str, Any], thresholds: dict[str, float]) -> list
     for name, limit in thresholds.items():
         key, direction = THRESHOLD_KEYS.get(name, (name, "min"))
         value = head.get(key)
-        passed = value is not None and (value >= limit if direction == "min" else value <= limit)
+        # None = not measurable in this run (e.g. a subset with no fairness pairs): neither pass nor fail.
+        passed = None if value is None else (value >= limit if direction == "min" else value <= limit)
         out.append({"name": name, "metric": key, "value": value, "limit": limit, "direction": direction,
                     "passed": passed})
     return out

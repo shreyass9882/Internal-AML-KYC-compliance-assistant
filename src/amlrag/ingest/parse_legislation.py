@@ -159,8 +159,11 @@ def parse_legislation_lines(
     section_label: str = "s",
     include_parts: list[str] | None = None,
     url: str | None = None,
+    include_sections: list[str] | None = None,
 ) -> list[Section]:
+    """include_parts keeps whole Parts; include_sections adds single sections from other Parts."""
     sec_re = re.compile(section_pattern)
+    extra_sections = set(include_sections or ())
     lines = _drop_toc(lines)
     heads: list[_Heading] = []
     for i, line in enumerate(lines):
@@ -214,7 +217,7 @@ def parse_legislation_lines(
         nxt = heads2[j + 1].idx if j + 1 < len(heads2) else len(lines)
         body = _join_body(lines[h.idx + 1 + h.extra:nxt])
         part_no = part[0] if part else (h.number.split("-")[0] if "-" in h.number else None)
-        if include_parts and part_no not in include_parts:
+        if include_parts and part_no not in include_parts and h.number not in extra_sections:
             continue
         path = []
         if part:
@@ -239,10 +242,10 @@ def parse_legislation_lines(
 
 def parse_legislation_file(path: Path, doc_id: str, doc_title: str, doc_short: str, section_pattern: str,
                            section_label: str = "s", include_parts: list[str] | None = None,
-                           url: str | None = None) -> list[Section]:
+                           url: str | None = None, include_sections: list[str] | None = None) -> list[Section]:
     if path.suffix.lower() == ".pdf":
         lines = _strip_running_heads(pdf_to_pages(path))
     else:
         lines = _strip_running_heads(text_to_pages(path.read_text(encoding="utf-8", errors="replace")))
     return parse_legislation_lines(lines, doc_id, doc_title, doc_short, section_pattern, section_label,
-                                   include_parts, url)
+                                   include_parts, url, include_sections)

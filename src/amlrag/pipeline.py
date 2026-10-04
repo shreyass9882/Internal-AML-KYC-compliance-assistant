@@ -1,6 +1,7 @@
 """End-to-end assistant: retrieve -> (facts) -> generate -> verify -> guardrails."""
 from __future__ import annotations
 
+import json
 import logging
 import time
 from typing import Any
@@ -14,6 +15,8 @@ from amlrag.generate.prompts import (
     CLOSED_EXPLAIN_SCHEMA,
     DETERMINE_SCHEMA,
     EXPLAIN_SCHEMA,
+    PROMPT_VERSION,
+    RETRY_UNCITED,
     closed_determine_messages,
     closed_explain_messages,
     determine_messages,
@@ -25,7 +28,7 @@ from amlrag.index.store import VectorStore
 from amlrag.ingest.build import read_chunks
 from amlrag.ingest.fetch import snapshot_date
 from amlrag.models import Retrieved
-from amlrag.retrieve.facts import extract_facts, sub_queries
+from amlrag.retrieve.facts import extract_facts, mentions_fact, sub_queries
 from amlrag.retrieve.hybrid import Retriever
 
 log = logging.getLogger(__name__)
@@ -40,6 +43,44 @@ FLAG_NO_CITATION = "Answer withheld: no valid citation"
 FLAG_MODEL_ABSTAINED = "The model could not answer from the sources"
 FLAG_ESCALATED = "Tier escalated by guardrail"
 FLAG_CLOSED_BOOK = "Closed-book baseline: no sources retrieved"
+FLAG_UNDESCRIBED = "The scenario does not describe the customer"
+
+# A scenario this short with no extracted facts at all ("A customer wants to open an account")
+# can't support any tier. The model is told so, but an 8-9B model still tends to answer "standard".
+_UNDESCRIBED_MAX_WORDS = 30
+
+
+# Wording that presents something as not known. Used to catch an answer that calls a fact the
+# scenario explicitly denies "not stated" (adversarial test A01).
+_UNKNOWN_WORDS = ("not state", "not say", "doesn't say", "not specif", "not mention", "unknown", "unclear",
+                  "not known", "not clear", "no information", "not provided", "not given")
+
+
+def ruled_out_called_unknown(facts: dict[str, Any] | None, texts: list[str], missing: list[str]) -> list[str]:
+    """Sentences that treat a fact the scenario rules out as unknown.
+
+    Flags (never removes) a missing_information item about a ruled-out fact, and a reasoning or
+    summary sentence that both mentions a ruled-out fact and calls it unstated. A wrongly ruled-out
+    fact must not silently hide a real gap, so these become a warning for the reviewer.
+    """
+    ruled = list((facts or {}).get("ruled_out") or [])
+    if not ruled:
+        return []
+    hits = [m for m in missing if any(mentions_fact(m, k) for k in ruled)]
+    for t in texts:
+        low = t.lower()
+        if any(w in low for w in _UNKNOWN_WORDS) and any(mentions_fact(t, k) for k in ruled):
+            hits.append(t)
+    return hits
+
+
+def undescribed_customer(facts: dict[str, Any] | None, scenario: str) -> bool:
+    """True when a short scenario gives nothing to decide a tier on: no customer type, risk, PEP or trigger."""
+    if not facts or len(scenario.split()) > _UNDESCRIBED_MAX_WORDS:
+        return False
+    any_trigger = any(v is True for v in facts.values())
+    return (facts.get("customer_type") in (None, "unknown") and facts.get("ml_tf_risk") in (None, "unknown")
+            and facts.get("pep_status") in (None, "unknown", "none") and not any_trigger)
 CLOSED_BOOK_WARNING = ("Closed-book baseline: this answer comes from the model's own training with no retrieved "
                        "sources. Its references were checked only for whether the section exists in the snapshot.")
 EXPLAIN_GROUPS = {"key_points": "point"}
@@ -88,13 +129,29 @@ class Assistant:
             "warnings": [],
             "facts": facts, "sources": self._sources(results, []), "checks": {}, "timings": timings,
             "models": {"embedder": self.embedder_name, "generator": getattr(self.llm, "name", "?")},
-            "snapshot": self.snapshot, "offline_stub": self.offline_stub,
+            "snapshot": self.snapshot, "offline_stub": self.offline_stub, "prompt_version": PROMPT_VERSION,
         }
 
     def _retrieve(self, text: str, facts) -> tuple[list[Retrieved], float]:
         t0 = time.perf_counter()
         results = self.retriever.search(text, sub_queries(facts))
         return results, time.perf_counter() - t0
+
+    def _retry_uncited(self, messages, out, schema, task, label_map, groups, scenario=None):
+        """Ask once more when the model answered but cited nothing, so the answer would be withheld.
+
+        This repairs the format only: the retry sees the same sources and instructions plus its
+        own first answer. Returns (output, verification) if the retry cites something, else None.
+        """
+        retry = messages + [{"role": "assistant", "content": json.dumps(out, ensure_ascii=False)},
+                            {"role": "user", "content": RETRY_UNCITED}]
+        try:
+            out2, _ = self.llm.chat_json(retry, schema, task=task)
+        except Exception:
+            log.warning("retry after an uncited answer failed", exc_info=True)
+            return None
+        ver2 = verify(out2, label_map, self.cfg.verification.min_support_overlap, groups, scenario)
+        return (out2, ver2) if ver2.cited_labels else None
 
     # -------------------------------------------------------------------- modes
     def determine(self, scenario: str) -> dict[str, Any]:
@@ -127,6 +184,13 @@ class Assistant:
             timings["total_s"] = round(time.perf_counter() - t_start, 3)
             return self._abstain("determine", scenario, f"The language model failed to answer ({exc}).",
                                  results, facts, timings, FLAG_MODEL_ERROR)
+        retried = False
+        if out.get("tier") != ABSTAIN and not verify(out, label_map, self.cfg.verification.min_support_overlap,
+                                                      DETERMINE_GROUPS, scenario).cited_labels:
+            fixed = self._retry_uncited(messages, out, DETERMINE_SCHEMA, "determine", label_map,
+                                        DETERMINE_GROUPS, scenario)
+            if fixed:
+                out, retried = fixed[0], True
         timings["generation_s"] = round(time.perf_counter() - t0, 3)
 
         model_tier = out.get("tier") if out.get("tier") in DETERMINE_SCHEMA["properties"]["tier"]["enum"] else ABSTAIN
@@ -138,15 +202,23 @@ class Assistant:
             out.setdefault("reasoning", [])
             out["reasoning"] = list(out["reasoning"]) + guard["added_points"]
 
-        ver = verify(out, label_map, self.cfg.verification.min_support_overlap, DETERMINE_GROUPS)
+        ver = verify(out, label_map, self.cfg.verification.min_support_overlap, DETERMINE_GROUPS, scenario)
         confidence, notes = cap_confidence(str(out.get("confidence", "low")), ver,
                                            self.cfg.verification.max_unsupported_share)
         warnings += notes
         final_tier = guard["tier"]
+        undescribed = final_tier == "standard" and undescribed_customer(facts, scenario)
+        if undescribed:
+            final_tier = ABSTAIN
 
         abstained = final_tier == ABSTAIN
         abstain_reason = flag_reason = None
-        if not abstained and not ver.cited_labels:
+        if undescribed:
+            abstain_reason = ("The scenario doesn't say who or what the customer is, so no CDD tier can be determined. "
+                              "Describe the customer: their type (individual, company, trust...), risk rating, and "
+                              "any PEP or high-risk country links.")
+            flag_reason = FLAG_UNDESCRIBED
+        elif not abstained and not ver.cited_labels:
             abstained, final_tier = True, ABSTAIN
             abstain_reason = "The model gave a determination without any valid citation, so it was withheld."
             flag_reason = FLAG_NO_CITATION
@@ -156,12 +228,22 @@ class Assistant:
         elif guard["escalated"]:
             flag_reason = FLAG_ESCALATED
 
+        missing = [str(m) for m in out.get("missing_information", [])]
+        called_unknown = ruled_out_called_unknown(
+            facts, [p.text for p in ver.points.get("reasoning", [])] + [str(out.get("summary", ""))], missing)
+        if called_unknown and not undescribed:
+            warnings.append("The answer treats something the scenario rules out as unknown. Check it against the "
+                            "scenario: " + "; ".join(f'"{t[:90]}"' for t in called_unknown[:2]))
+        measures = ver.points.get("required_measures", [])
+
         points = [{"group": g, **p.to_dict(label_map)} for g, ps in ver.points.items() for p in ps]
         timings["total_s"] = round(time.perf_counter() - t_start, 3)
         return {
             "mode": "determine", "query": scenario, "tier": final_tier, "model_tier": model_tier,
-            "summary": str(out.get("summary", "")).strip(), "points": points,
-            "missing_information": [str(m) for m in out.get("missing_information", [])],
+            # When no customer is described, the model's own (tier-giving) reasoning is withheld.
+            "summary": abstain_reason if undescribed else str(out.get("summary", "")).strip(),
+            "points": [] if undescribed else points,
+            "missing_information": missing,
             "confidence": "low" if abstained else confidence, "abstained": abstained,
             "abstain_reason": abstain_reason, "flag_reason": flag_reason,
             "needs_review": abstained or confidence == "low" or bool(warnings),
@@ -169,10 +251,16 @@ class Assistant:
             "escalated": guard["escalated"], "sources": self._sources(results, ver.cited_labels),
             "checks": {"citation_validity": round(ver.citation_validity, 3), "points": len(ver.all_points),
                        "unsupported_points": len(ver.unsupported), "uncited_points": len(ver.uncited),
-                       "max_similarity": round(max_sim, 4)},
+                       "max_similarity": round(max_sim, 4), "retried_uncited": retried,
+                       # Citation validity says each citation points to a retrieved passage; supported_points
+                       # says how many points their cited text actually backs (lexical check). Not the same.
+                       "supported_points": len(ver.all_points) - len(ver.unsupported),
+                       "ruled_out_called_unknown": len(called_unknown) if not undescribed else 0,
+                       "required_measures": sum(1 for p in measures if p.required is True),
+                       "optional_measures": sum(1 for p in measures if p.required is False)},
             "timings": timings, "llm_stats": stats,
             "models": {"embedder": self.embedder_name, "generator": getattr(self.llm, "name", "?")},
-            "snapshot": self.snapshot, "offline_stub": self.offline_stub,
+            "snapshot": self.snapshot, "offline_stub": self.offline_stub, "prompt_version": PROMPT_VERSION,
         }
 
     def explain(self, question: str) -> dict[str, Any]:
@@ -198,9 +286,13 @@ class Assistant:
             timings["total_s"] = round(time.perf_counter() - t_start, 3)
             return self._abstain("explain", question, f"The language model failed to answer ({exc}).",
                                  results, None, timings, FLAG_MODEL_ERROR)
-        timings["generation_s"] = round(time.perf_counter() - t0, 3)
-
         ver = verify(out, label_map, self.cfg.verification.min_support_overlap, EXPLAIN_GROUPS)
+        retried = False
+        if out.get("answerable", True) and not ver.cited_labels:
+            fixed = self._retry_uncited(messages, out, EXPLAIN_SCHEMA, "explain", label_map, EXPLAIN_GROUPS)
+            if fixed:
+                (out, ver), retried = fixed, True
+        timings["generation_s"] = round(time.perf_counter() - t0, 3)
         confidence, notes = cap_confidence(str(out.get("confidence", "low")), ver,
                                            self.cfg.verification.max_unsupported_share)
         answerable = bool(out.get("answerable", True)) and bool(ver.cited_labels)
@@ -218,10 +310,11 @@ class Assistant:
             "facts": None, "sources": self._sources(results, ver.cited_labels if answerable else []),
             "checks": {"citation_validity": round(ver.citation_validity, 3), "points": len(ver.all_points),
                        "unsupported_points": len(ver.unsupported), "uncited_points": len(ver.uncited),
-                       "max_similarity": round(max_sim, 4)},
+                       "max_similarity": round(max_sim, 4), "retried_uncited": retried,
+                       "supported_points": len(ver.all_points) - len(ver.unsupported)},
             "timings": timings, "llm_stats": stats,
             "models": {"embedder": self.embedder_name, "generator": getattr(self.llm, "name", "?")},
-            "snapshot": self.snapshot, "offline_stub": self.offline_stub,
+            "snapshot": self.snapshot, "offline_stub": self.offline_stub, "prompt_version": PROMPT_VERSION,
         }
 
     # ------------------------------------------------------------ closed-book baseline
@@ -290,7 +383,7 @@ class Assistant:
             "timings": {"generation_s": stats.get("latency_s"), "total_s": round(time.perf_counter() - t_start, 3)},
             "llm_stats": stats,
             "models": {"embedder": None, "generator": getattr(self.llm, "name", "?")},
-            "snapshot": self.snapshot, "offline_stub": self.offline_stub,
+            "snapshot": self.snapshot, "offline_stub": self.offline_stub, "prompt_version": PROMPT_VERSION,
         }
 
     def ask(self, mode: str, text: str) -> dict[str, Any]:

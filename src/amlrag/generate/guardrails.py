@@ -70,6 +70,7 @@ def apply_guardrails(tier: str, facts: dict[str, Any] | None, label_map: dict[st
                 result["tier"] = "enhanced"
                 result["escalated"] = True
                 result["added_points"].append({
+                    "kind": "conclusion",
                     "point": f"Escalated by guardrail: the scenario indicates {t.label}. The cited source "
                              f"treats this as requiring enhanced CDD. A compliance officer should confirm.",
                     "sources": [label],

@@ -34,7 +34,14 @@ def test_sub_queries_follow_facts():
     assert facts["ml_tf_risk"] == "unknown"
     qs = " | ".join(sub_queries(facts))
     assert "trust" in qs and "foreign politically exposed" in qs and "call for action" in qs
+    # The enhanced CDD trigger and the PEP obligations (incl. senior manager approval) are searched separately.
+    assert "when you must apply enhanced customer due diligence foreign politically exposed person" in qs
+    assert "senior manager approval" in qs
     assert sub_queries(None) == []
+    # A domestic PEP only gets the obligations query when the risk is high.
+    dom = normalise_facts({"customer_type": "individual", "pep_status": "domestic", "ml_tf_risk": "medium"})
+    assert not any("senior manager" in q for q in sub_queries(dom))
+    assert any("senior manager" in q for q in sub_queries({**dom, "ml_tf_risk": "high"}))
 
 
 def test_foreign_pep_scenario_retrieves_pep_rule(assistant):

@@ -90,6 +90,16 @@ verification:
   # flag:     keep the model's tier but mark needs_review with a warning.
   guardrail_mode: escalate
 
+server:
+  # Sign-in for the web app. Leave the passwords empty when only you use it on this computer.
+  # Set them before sharing the app with anyone else (e.g. through a tunnel), and set them as
+  # environment variables, not here, so they never end up in a shared copy of the project:
+  #   AMLRAG_SERVER__PASSWORD=...           everyone signs in as `username` with this password
+  #   AMLRAG_SERVER__MANAGER_PASSWORD=...   optional: only "manager" with this password sees Review gaps
+  username: cdd
+  password: null
+  manager_password: null
+
 query_log:
   enabled: true
   # What is stored of each question for the Review gaps view:

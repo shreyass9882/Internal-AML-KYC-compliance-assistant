@@ -20,18 +20,20 @@ class Judge:
         if cache_path and cache_path.exists():
             self.cache = json.loads(cache_path.read_text(encoding="utf-8"))
 
-    def _key(self, claim: str, passages: list[str]) -> str:
-        h = hashlib.sha256((self.name + "\x00" + claim + "\x00" + "\x00".join(passages)).encode())
+    def _key(self, claim: str, passages: list[str], scenario: str | None) -> str:
+        h = hashlib.sha256((self.name + "\x00" + claim + "\x00" + "\x00".join(passages)
+                            + ("\x01" + scenario if scenario else "")).encode())
         return h.hexdigest()[:24]
 
-    def supported(self, claim: str, passages: list[str]) -> bool | None:
-        if not passages:
+    def supported(self, claim: str, passages: list[str], scenario: str | None = None) -> bool | None:
+        """Judge a claim against cited passages and, for facts and conclusions, the scenario."""
+        if not passages and not scenario:
             return False
-        key = self._key(claim, passages)
+        key = self._key(claim, passages, scenario)
         if key in self.cache:
             return self.cache[key]
         try:
-            out, _ = self.llm.chat_json(judge_messages(claim, passages), JUDGE_SCHEMA, task="judge")
+            out, _ = self.llm.chat_json(judge_messages(claim, passages, scenario), JUDGE_SCHEMA, task="judge")
             verdict = bool(out.get("supported"))
         except Exception as exc:
             log.warning("judge failed: %s", exc)

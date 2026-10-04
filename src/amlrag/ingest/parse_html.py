@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import re
 from collections import Counter
+from urllib.parse import quote
 
 from bs4 import BeautifulSoup, NavigableString, Tag
 
@@ -164,7 +165,9 @@ def parse_guidance_html(html: bytes | str, doc_id: str, doc_title: str, url: str
             section_key=key,
             heading_path=[title, *path],
             text=normalise(text),
-            url=(f"{url}#{anchor}" if url and anchor else url),
+            # AUSTRAC heading ids contain spaces and curly quotes ("When you don’t need to …");
+            # percent-encode so the link stays one clickable URL. Browsers decode it to find the id.
+            url=(f"{url}#{quote(anchor, safe='')}" if url and anchor else url),
             section_title=path[-1] if path else title,
             doc_short=f"AUSTRAC: {title}",
             last_updated=last_updated,

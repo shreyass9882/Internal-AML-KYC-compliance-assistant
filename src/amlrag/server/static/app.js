@@ -149,11 +149,21 @@
       onclick: () => focusSource(c.label) }, c.label);
   }
 
+  const KIND_LABEL = { scenario_fact: "Fact", rule: "Rule", conclusion: "Therefore" };
+
   function pointItem(p) {
-    return el("li", { class: p.supported ? "" : "weak" },
-      p.text, p.citations.map(citeChip),
-      p.citations.length === 0 ? el("span", { class: "weak-note", text: "No valid citation: do not rely on this point." })
-        : !p.supported ? el("span", { class: "weak-note", text: "Weakly supported by the cited text: check the source." }) : null);
+    const kind = p.kind && KIND_LABEL[p.kind] ? el("span", { class: `kind kind-${p.kind}`, text: KIND_LABEL[p.kind] }) : null;
+    let note = null;
+    if (p.kind === "scenario_fact") {
+      // Facts are checked against the scenario, not against a source.
+      note = p.supported ? el("span", { class: "fact-note", text: "From your scenario" })
+        : el("span", { class: "weak-note", text: "Not clearly in your scenario: check this fact." });
+    } else if (p.citations.length === 0) {
+      note = el("span", { class: "weak-note", text: "No valid citation: do not rely on this point." });
+    } else if (!p.supported) {
+      note = el("span", { class: "weak-note", text: "Weakly supported by the cited text: check the source." });
+    }
+    return el("li", { class: p.supported ? "" : "weak" }, kind, p.text, p.citations.map(citeChip), note);
   }
 
   function renderResult(r) {
@@ -172,11 +182,17 @@
     if (r.warnings && r.warnings.length) {
       card.append(el("div", { class: "warnings" }, r.warnings.map((w) => el("div", { class: "warning", text: w }))));
     }
-    const groups = r.mode === "determine"
-      ? [["reasoning", "Why"], ["required_measures", "What you need to do"]]
-      : [["key_points", "Key points"]];
-    for (const [key, title] of groups) {
-      const pts = (r.points || []).filter((p) => p.group === key);
+    // Measures are split by what the source says: required in this situation, or an option to match
+    // the customer's risk (prompt v3.2). Older answers carry no flag and keep the single heading.
+    const isMeasure = (p) => p.group === "required_measures";
+    const sections = r.mode === "determine"
+      ? [["Why", (p) => p.group === "reasoning"],
+         ["Required by the rules", (p) => isMeasure(p) && p.required === true],
+         ["May be appropriate, depending on the customer's risk", (p) => isMeasure(p) && p.required === false],
+         ["What you need to do", (p) => isMeasure(p) && p.required !== true && p.required !== false]]
+      : [["Key points", (p) => p.group === "key_points"]];
+    for (const [title, keep] of sections) {
+      const pts = (r.points || []).filter(keep);
       if (pts.length) card.append(el("h3", { text: title }), el("ul", { class: "points" }, pts.map(pointItem)));
     }
     if (r.missing_information && r.missing_information.length) {
@@ -192,7 +208,14 @@
       el("span", { text: `${(t.total_s || 0).toFixed(1)}s` }),
       el("span", { text: `Snapshot ${r.snapshot || "unknown"}` }),
       el("span", { text: (r.models && r.models.generator || "").replace("ollama:", "") }),
-      r.checks && r.checks.citation_validity !== undefined ? el("span", { text: `Citation validity ${Math.round(r.checks.citation_validity * 100)}%` }) : null,
+      // Two different checks: does each citation point to a passage that was really retrieved, and
+      // does the cited text actually back the point. 100% on the first says nothing about the second.
+      r.checks && r.checks.citation_validity !== undefined ? el("span", {
+        title: "Every citation points to a passage the system really retrieved (none invented).",
+        text: `Citations traced to sources ${Math.round(r.checks.citation_validity * 100)}%` }) : null,
+      r.checks && r.checks.supported_points !== undefined && r.checks.points ? el("span", {
+        title: "How many points their cited text backs, by a word-overlap check. Read the source for any flagged point.",
+        text: `Points backed by their evidence: ${r.checks.supported_points} of ${r.checks.points}` }) : null,
       r.query_id ? fb : null));
 
     const sources = r.sources || [];

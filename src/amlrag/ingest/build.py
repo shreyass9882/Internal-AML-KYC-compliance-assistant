@@ -30,7 +30,7 @@ def parse_all(cfg: Config) -> tuple[list[Section], list[str]]:
             if not doc.section_pattern:
                 raise ValueError(f"{doc.id}: legislation needs section_pattern in kb/sources.yaml")
             secs = parse_legislation_file(path, doc.id, doc.title, doc.short, doc.section_pattern,
-                                          doc.section_label, doc.include_parts, url)
+                                          doc.section_label, doc.include_parts, url, doc.include_sections)
         elif path.suffix.lower() in (".html", ".htm"):
             secs = parse_guidance_html(path.read_bytes(), doc.id, doc.title, url)
         else:

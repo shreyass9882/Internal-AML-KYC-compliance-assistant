@@ -25,9 +25,13 @@ def write_report(path: Path, items: list[GoldItem], preds: dict[str, dict], m: d
     L.append(f"# Evaluation report: preset `{run.get('preset')}`\n")
     L.append(f"- Generator: `{run.get('generator')}`; embedder: `{run.get('embedder')}`; judge: `{run.get('judge')}`")
     L.append(f"- Knowledge-base snapshot: {run.get('snapshot') or 'unknown'} (index digest `{run.get('index_digest')}`)")
+    L.append(f"- Answer instructions: prompt version {run.get('prompt_version') or '1'}")
     L.append(f"- Gold file: `{run.get('gold_file')}`: {run.get('n_items')} items "
              f"({run.get('gold_status', {}).get('reviewed', 0)} reviewed, {run.get('gold_status', {}).get('draft', 0)} draft)")
     L.append(f"- Duration: {run.get('duration_s')} s; finished {run.get('finished')}\n")
+    if run.get("rescored_from"):
+        L.append(f"> **Rescored** on {run.get('rescored_at')}: the answers are those of run `{run.get('rescored_from')}`, "
+                 f"scored again against the current gold set (digest `{run.get('gold_digest')}`).\n")
     if run.get("judge_same_as_generator"):
         L.append("> **The judge is the same model that wrote the answers**, so the faithfulness score is likely "
                  "inflated. Re-run with a judge from a different model family before reporting it.\n")
@@ -44,12 +48,20 @@ def write_report(path: Path, items: list[GoldItem], preds: dict[str, dict], m: d
     L.append("| Check | Value | Limit | Result |\n|---|---|---|---|")
     for a in m.get("acceptance", []):
         op = "≥" if a["direction"] == "min" else "≤"
-        L.append(f"| {a['name']} | {_fmt(a['value'])} | {op} {a['limit']} | {'PASS' if a['passed'] else '**FAIL**'} |")
+        L.append(f"| {a['name']} | {_fmt(a['value'])} | {op} {a['limit']} | {'n/a' if a['passed'] is None else 'PASS' if a['passed'] else '**FAIL**'} |")
 
     L.append("\n## Headline metrics\n")
     L.append("| Metric | Value |\n|---|---|")
     for k, v in m["headline"].items():
         L.append(f"| {k} | {_fmt(v)} |")
+
+    a = m.get("attribution", {})
+    L.append("\n## Answer checks\n")
+    L.append("Citation validity means each citation points to a passage that was really retrieved. Whether that "
+             "passage supports the claim is measured separately (faithfulness, below).\n")
+    L.append(f"- Answers with a point that cites nothing: {a.get('answers_with_uncited_points', 0)}")
+    L.append(f"- Answers that call a fact the scenario rules out unknown: "
+             f"{a.get('answers_calling_ruled_out_fact_unknown', 0)}")
 
     t = m["tier"]
     L.append(f"\n## Tier determination ({t['n']} answerable scenarios)\n")
@@ -97,6 +109,19 @@ def write_report(path: Path, items: list[GoldItem], preds: dict[str, dict], m: d
                  f"{(bs or {}).get('n', 0)} |")
         if not bs:
             L.append(f"\n_BERTScore: {bs_info.get('status', 'not computed')}._")
+
+    fa = m.get("faithfulness") or {}
+    if fa.get("by_kind"):
+        L.append("\n## Faithfulness by kind of claim\n")
+        L.append("Each claim is judged against its own evidence: a fact restated from the scenario against the "
+                 "scenario, a rule against the passages it cites, a conclusion against its cited passages and the "
+                 "scenario, and a measure or key point against its cited passages. Runs before prompt version 2 "
+                 "have no kinds, so their reasoning points appear as `reasoning`.\n")
+        L.append("| Kind | n | Judge: supported | Lexical: supported |\n|---|---|---|---|")
+        for kind, v in fa["by_kind"].items():
+            L.append(f"| {kind} | {v['n']} | {_fmt(v['judge_supported_rate'])} | {_fmt(v['lexical_supported_rate'])} |")
+        L.append(f"\nClaims that must come from a source (all kinds except `scenario_fact`): "
+                 f"**{_fmt(fa.get('source_claims_judge_rate'))}** supported by the judge.")
 
     f = m.get("fairness")
     if f and f.get("groups"):
@@ -150,8 +175,11 @@ def write_report(path: Path, items: list[GoldItem], preds: dict[str, dict], m: d
     weak = [(pid, pt) for pid, p in preds.items() if not p.get("closed_book") for pt in p.get("points", [])
             if pt.get("judge_supported") is False or (pt.get("judge_supported") is None and not pt.get("supported_lexical"))]
     L.append(f"\n## Unsupported claims ({len(weak)})\n")
-    for pid, pt in weak[:25]:
-        L.append(f"- **{pid}**: {pt['text']} _(cited: {', '.join(pt['chunk_ids']) or 'none'})_")
+    for pid, pt in weak[:40]:
+        kind = pt.get("kind") or pt.get("group") or ""
+        L.append(f"- **{pid}** [{kind}]: {pt['text']} _(cited: {', '.join(pt['chunk_ids']) or 'none'})_")
+    if len(weak) > 40:
+        L.append(f"- …and {len(weak) - 40} more in predictions.jsonl (`judge_supported: false`).")
 
     miss = m["retrieval"].get("items_without_reachable_refs")
     if miss:
@@ -188,8 +216,8 @@ def compare_runs(run_dirs: list[Path], out_path: Path) -> str:
         return str(name or "?").replace("ollama:", "")
 
     # Label columns by whatever differs between the runs: preset, answer model, embedding model.
-    vary = {key: len({str(m.get("run", {}).get(key)) for _, m in loaded}) > 1
-            for key in ("preset", "generator", "embedder")}
+    vary = {key: len({str(m.get("run", {}).get(key) or "") for _, m in loaded}) > 1
+            for key in ("preset", "generator", "embedder", "prompt_version")}
     results: dict[str, dict[str, Any]] = {}
     notes = []
     for d, m in loaded:
@@ -199,18 +227,26 @@ def compare_runs(run_dirs: list[Path], out_path: Path) -> str:
             parts.append(short(run.get("generator")))
         if vary["embedder"]:
             parts.append(short(run.get("embedder")))
+        if vary["prompt_version"]:
+            parts.append(f"prompt v{run.get('prompt_version') or 1}")
         label = " · ".join(parts)
         while label in results:
             label += "'"
         results[label] = m
         notes.append(f"{label}: {d.name}, {run.get('n_items')} items, answers {short(run.get('generator'))}, "
                      f"embeddings {short(run.get('embedder'))}, judge {run.get('judge')}, "
-                     f"snapshot {run.get('snapshot')}, index {run.get('index_digest')}")
+                     f"snapshot {run.get('snapshot')}, index {run.get('index_digest')}, "
+                     f"prompt v{run.get('prompt_version') or 1}, gold {run.get('gold_digest') or 'unrecorded'}"
+                     + (f" (rescored from {run['rescored_from']})" if run.get("rescored_from") else ""))
     digests = {r.get("run", {}).get("index_digest") for r in results.values()}
     ns = {r.get("run", {}).get("n_items") for r in results.values()}
     if len(digests) > 1 or len(ns) > 1:
         notes.insert(0, "**Warning:** these runs used different chunks or numbers of items, so they are not "
                         "directly comparable.")
+    golds = {r.get("run", {}).get("gold_digest") for r in results.values()}
+    if len(golds) > 1:
+        notes.insert(0, "**Warning:** these runs were scored against different versions of the gold set. Rescore "
+                        "the older run with `amlrag rescore <folder>` and compare the rescored folder instead.")
     write_comparison(out_path, results, "Run comparison",
                      "Each column is one evaluation run. Only compare runs made on the same index and gold set.",
                      notes)

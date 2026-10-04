@@ -41,7 +41,7 @@ THRESHOLDS = [
 def test_threshold(metrics, name):
     check = next(a for a in metrics["acceptance"] if a["name"] == name)
     op = ">=" if check["direction"] == "min" else "<="
-    assert check["passed"], f"{check['metric']} = {check['value']} (required {op} {check['limit']})"
+    assert check["passed"] is True, f"{check['metric']} = {check['value']} (required {op} {check['limit']})"
 
 
 def test_no_item_errors(metrics):

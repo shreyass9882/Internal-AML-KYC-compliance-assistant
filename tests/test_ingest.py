@@ -31,6 +31,17 @@ def test_html_sections_follow_heading_hierarchy_and_anchors():
     assert "Foreign PEP | Source of wealth and source of funds" in measures.text  # table rendered as rows
 
 
+def test_html_anchor_with_spaces_is_percent_encoded():
+    # Real AUSTRAC pages use heading text (spaces, curly apostrophes) as the id.
+    html = ('<html><body><main><h1>Body corporate</h1>'
+            '<h2 id="When you don’t need to check beneficial owners">When you don’t need to check beneficial '
+            'owners</h2><p>' + "Listed companies and government bodies are exempt in some cases. " * 3 + '</p>'
+            '</main></body></html>')
+    (sec,) = parse_guidance_html(html.encode(), "d", "Body corporate", "https://example.org/bc")
+    assert sec.url == "https://example.org/bc#When%20you%20don%E2%80%99t%20need%20to%20check%20beneficial%20owners"
+    assert " " not in sec.url
+
+
 def test_html_keeps_nested_lists_and_accordions():
     secs = {s.section_key: s for s in _html_sections()}
     when = secs["when-you-must-apply-ecdd"].text
@@ -81,6 +92,19 @@ def test_legislation_include_parts_filter():
     secs = parse_legislation_file(FIX / "rules_sample.txt", "rules2025", "Rules", "AML/CTF Rules 2025",
                                   RULES_PATTERN, "s", ["6"])
     assert {s.section_key for s in secs} == {"6-18", "6-23"}
+
+
+def test_legislation_include_sections_adds_single_sections():
+    lines = ["Part 5—AML/CTF programs", "5-4 Something else",
+             "(1) A rule about programs that the knowledge base does not need at all.",
+             "5-5 Actions requiring approval or that senior manager be informed",
+             "(1) Senior manager approval is needed before providing a designated service to a foreign PEP.",
+             "Part 6—Customer due diligence", "6-9 Nature and purpose",
+             "(1) A reporting entity must understand the nature and purpose of the business relationship."]
+    secs = parse_legislation_lines(lines, "r", "R", "R", RULES_PATTERN, "s", ["6"], None, ["5-5"])
+    assert [s.section_key for s in secs] == ["5-5", "6-9"]
+    assert secs[0].heading_path[0] == "Part 5—AML/CTF programs"
+    assert [s.section_key for s in parse_legislation_lines(lines, "r", "R", "R", RULES_PATTERN, "s", ["6"])] == ["6-9"]
 
 
 def test_legislation_en_dash_numbers_are_normalised():

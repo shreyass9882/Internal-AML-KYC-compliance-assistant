@@ -5,6 +5,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+from amlrag.generate.prompts import POINT_KINDS
 from amlrag.models import Retrieved
 from amlrag.textutil import content_words
 
@@ -34,10 +35,18 @@ class VerifiedPoint:
     invalid_labels: list[str]
     support: float
     supported: bool
+    kind: str | None = None   # scenario_fact | rule | conclusion for reasoning points; None otherwise
+    required: bool | None = None  # measures only: True = a source requires it here, False = a risk-based option
+
+    @property
+    def needs_citation(self) -> bool:
+        """A fact taken from the scenario is checked against the scenario, not a source."""
+        return self.kind != "scenario_fact"
 
     def to_dict(self, label_map: dict[str, Retrieved]) -> dict[str, Any]:
         return {
             "text": self.text,
+            "kind": self.kind,
             "citations": [
                 {"label": l, "chunk_id": label_map[l].chunk.chunk_id, "citation": label_map[l].chunk.citation,
                  "url": label_map[l].chunk.url}
@@ -46,6 +55,7 @@ class VerifiedPoint:
             "invalid_labels": self.invalid_labels,
             "support": round(self.support, 3),
             "supported": self.supported,
+            "required": self.required,
         }
 
 
@@ -65,7 +75,7 @@ class Verification:
 
     @property
     def uncited(self) -> list[VerifiedPoint]:
-        return [p for p in self.all_points if not p.labels]
+        return [p for p in self.all_points if p.needs_citation and not p.labels]
 
     @property
     def unsupported(self) -> list[VerifiedPoint]:
@@ -82,8 +92,13 @@ class Verification:
 
 
 def verify(output: dict[str, Any], label_map: dict[str, Retrieved], min_support: float,
-           groups: dict[str, str]) -> Verification:
-    """groups maps an output key (e.g. "reasoning") to the text field of its items (e.g. "point")."""
+           groups: dict[str, str], scenario: str | None = None) -> Verification:
+    """groups maps an output key (e.g. "reasoning") to the text field of its items (e.g. "point").
+
+    Each point is checked against its own evidence: a scenario_fact against the scenario, a rule
+    against its cited passages, a conclusion against its cited passages plus the scenario (it
+    applies one to the other). Points without a kind (measures, key points) need cited passages.
+    """
     ver = Verification()
     for key, text_field in groups.items():
         items = output.get(key) or []
@@ -107,8 +122,17 @@ def verify(output: dict[str, Any], label_map: dict[str, Retrieved], min_support:
                         labels.append(lab)
                 else:
                     invalid.append(str(raw))
-            support = lexical_support(text, [label_map[l].chunk.text for l in labels]) if labels else 0.0
-            vps.append(VerifiedPoint(text, labels, invalid, support, bool(labels) and support >= min_support))
+            kind = item.get("kind") if item.get("kind") in POINT_KINDS else None
+            passages = [label_map[l].chunk.text for l in labels]
+            if kind == "scenario_fact" and scenario:
+                support = lexical_support(text, [scenario])
+                supported = support >= min_support
+            else:
+                evidence = passages + ([scenario] if kind == "conclusion" and scenario else [])
+                support = lexical_support(text, evidence) if labels else 0.0
+                supported = bool(labels) and support >= min_support
+            required = item.get("required") if isinstance(item.get("required"), bool) else None
+            vps.append(VerifiedPoint(text, labels, invalid, support, supported, kind, required))
         ver.points[key] = vps
     return ver
 

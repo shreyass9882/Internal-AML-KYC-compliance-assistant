@@ -135,8 +135,9 @@ class StubLLM:
                     "missing_information": [], "confidence": "high"}, stats
 
         if task == "judge":
-            claim = user.split("CLAIM:", 1)[-1].split("PASSAGES:", 1)[0]
-            passages = user.split("PASSAGES:", 1)[-1]
+            body = user.split("CLAIM:", 1)[-1] if "CLAIM:" in user else user.split("STATEMENT:", 1)[-1]
+            claim, _, evidence = body.partition("\n\n")
+            passages = evidence  # scenario and/or passages, whichever were given
             cw = content_words(claim)
             overlap = len(cw & content_words(passages)) / max(1, len(cw))
             return {"supported": overlap >= 0.5, "reason": f"lexical overlap {overlap:.2f}"}, stats
@@ -166,8 +167,15 @@ class StubLLM:
         return {
             "tier": tier,
             "summary": f"Offline stub determination: {tier.replace('_', ' ')}.",
-            "reasoning": [{"point": point_text, "sources": cited[:1]}],
-            "required_measures": [{"measure": "Collect and verify KYC information.", "sources": cited[-1:]}],
+            "reasoning": [
+                {"kind": "scenario_fact", "point": query.split("FACTS", 1)[0].strip().split(". ")[0][:200],
+                 "sources": []},
+                {"kind": "rule", "point": point_text, "sources": cited[:1]},
+                {"kind": "conclusion", "point": f"So the tier is {tier.replace('_', ' ')}: {point_text[:120]}",
+                 "sources": cited[:1]},
+            ],
+            "required_measures": [{"measure": "Collect and verify KYC information.", "required": True,
+                                   "sources": cited[-1:]}],
             "missing_information": f["missing_information"],
             "confidence": "medium" if tier != "insufficient_information" else "low",
         }, stats

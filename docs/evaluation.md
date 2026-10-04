@@ -45,7 +45,16 @@ Over answerable items whose expected documents are indexed (items that reference
 
 ### Faithfulness
 
-Each cited reasoning point is checked against the text of the chunks it cites.
+Since prompt version 2, each reasoning point says what kind of claim it is, and each kind is checked against its own evidence:
+
+| Kind | What it is | Checked against |
+|---|---|---|
+| `scenario_fact` | a fact restated from the customer scenario | the scenario (no citation needed) |
+| `rule` | what a source says | the passages it cites |
+| `conclusion` | the rule applied to the facts | the passages it cites plus the scenario |
+| measure / key point | a required step, or a point in an explanation | the passages it cites |
+
+The report breaks faithfulness down by kind, and `source_claims_judge_rate` gives the rate for everything except scenario facts. Runs before version 2 have no kinds, so their reasoning points show as `reasoning`. For a like-for-like comparison with such a run, use the rates for measures and key points, which are judged the same way in both versions.
 
 - `judge_supported_rate`: an LLM judge (`eval.judge_model`) decides whether the passages fully support the claim. Verdicts are cached in `results/.judge_cache.json`. Using the same model as the generator inflates this score, so the judge (`llama3.1:8b`) is from a different family than the answer model (`qwen3.5:9b`). If you evaluate `--model llama3.1:8b`, change the judge for that run. Say which judge you used in the report.
 - `lexical_supported_rate`: share of points whose content words mostly appear in the cited text (threshold `verification.min_support_overlap`). Crude, but free and deterministic; use it for quick iteration and the judge for reported numbers.
@@ -142,7 +151,18 @@ amlrag compare results/<first run> results/<second run>
 
 Retrieval recall and NDCG isolate the effect of the embedding model; tier accuracy shows whether better search turns into better answers. Recalibrate the abstention threshold for each embedding model before comparing refusal rates.
 
-Use the same judge for every run you compare. `--judge lexical` is the simplest way to guarantee that; for final numbers use an LLM judge that is a different family from both answer models.
+Use the same judge for every run you compare.
+
+## After correcting gold items: rescore, don't re-run
+
+Correcting the answer key changes what the earlier runs should have scored. `amlrag rescore` scores a finished run's saved answers again against the current gold set, without calling the model, and writes a `<run>-rescored-<time>` folder:
+
+```bash
+amlrag rescore results/20261001-031851-full-qwen3.5-9b_qwen3-embedding-8b
+amlrag compare results/20261001-031851-full-…-rescored-<time> results/<new run>
+```
+
+Every run records the gold file's digest, and `amlrag compare` warns when two runs were scored against different versions. Faithfulness verdicts are kept from the original run, because they don't depend on the gold set. Each run also records `prompt_version` (`src/amlrag/generate/prompts.py`), so a comparison shows which instructions produced which answers. `--judge lexical` is the simplest way to guarantee that; for final numbers use an LLM judge that is a different family from both answer models.
 
 ## Reviewing gold items
 

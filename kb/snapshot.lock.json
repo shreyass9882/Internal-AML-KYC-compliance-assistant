@@ -1,0 +1,176 @@
+{
+  "documents": {
+    "austrac-cdd-body-corporate": {
+      "bytes": 1363598,
+      "discovered": false,
+      "fetched_at": "2026-09-30T16:17:02.304882+00:00",
+      "file": "kb/manual/austrac-cdd-body-corporate.html",
+      "sha256": "2105e24ee40cdc63d56ba731b9f769520e69de5236612325e5651d8064e05f28",
+      "source": "manual",
+      "title": "Initial CDD for body corporate, partnership or unincorporated association",
+      "url": "https://www.austrac.gov.au/industry-and-business/obligations-and-guidance/your-amlctf-program/customer-due-diligence/initial-customer-due-diligence/initial-customer-due-diligence-guides-customer-type/initial-cdd-body-corporate-partnership-or-unincorporated-association"
+    },
+    "austrac-cdd-government-body": {
+      "bytes": 1345140,
+      "discovered": false,
+      "fetched_at": "2026-09-30T16:17:02.311926+00:00",
+      "file": "kb/manual/austrac-cdd-government-body.html",
+      "sha256": "50965085853b020aa55f9f5f02faccd9d0f58c8ec9bd6ef741962161201dabbe",
+      "source": "manual",
+      "title": "Initial CDD for a government body",
+      "url": "https://www.austrac.gov.au/industry-and-business/obligations-and-guidance/your-amlctf-program/customer-due-diligence/initial-customer-due-diligence/initial-customer-due-diligence-guides-customer-type/initial-cdd-government-body"
+    },
+    "austrac-cdd-individuals": {
+      "bytes": 1336252,
+      "discovered": false,
+      "fetched_at": "2026-09-30T16:17:02.297332+00:00",
+      "file": "kb/manual/austrac-cdd-individuals.html",
+      "sha256": "068dec1221b7f02501efc7c55c4f1c7d7c6f6ba5190598245d31fab5ad642c16",
+      "source": "manual",
+      "title": "Initial CDD for individuals",
+      "url": "https://www.austrac.gov.au/industry-and-business/obligations-and-guidance/your-amlctf-program/customer-due-diligence/initial-customer-due-diligence/initial-customer-due-diligence-guides-customer-type/initial-cdd-individuals"
+    },
+    "austrac-cdd-overview": {
+      "bytes": 1219724,
+      "discovered": false,
+      "fetched_at": "2026-09-30T16:17:02.282804+00:00",
+      "file": "kb/manual/austrac-cdd-overview.html",
+      "sha256": "476b68c773e947a5c737f4106456cfc4a2c811d7f81650780de6412a10752184",
+      "source": "manual",
+      "title": "Overview of customer due diligence",
+      "url": "https://www.austrac.gov.au/industry-and-business/obligations-and-guidance/your-amlctf-program/customer-due-diligence/overview-customer-due-diligence"
+    },
+    "austrac-cdd-sole-traders": {
+      "bytes": 1339023,
+      "discovered": false,
+      "fetched_at": "2026-09-30T16:17:02.301389+00:00",
+      "file": "kb/manual/austrac-cdd-sole-traders.html",
+      "sha256": "a35dd80ef1d9f505460d6e2961e2bcebd16cec525f8e8fe0710c2f0207b04c9a",
+      "source": "manual",
+      "title": "Initial CDD for sole traders",
+      "url": "https://www.austrac.gov.au/industry-and-business/obligations-and-guidance/your-amlctf-program/customer-due-diligence/initial-customer-due-diligence/initial-customer-due-diligence-guides-customer-type/initial-cdd-sole-traders"
+    },
+    "austrac-cdd-trust": {
+      "bytes": 1362036,
+      "discovered": false,
+      "fetched_at": "2026-09-30T16:17:02.308353+00:00",
+      "file": "kb/manual/austrac-cdd-trust.html",
+      "sha256": "68a7c4b5fe511ff56aabd6d9747998a1ccd884100b90f6a100a89e613b3b7608",
+      "source": "manual",
+      "title": "Initial CDD for trust",
+      "url": "https://www.austrac.gov.au/industry-and-business/obligations-and-guidance/your-amlctf-program/customer-due-diligence/initial-customer-due-diligence/initial-customer-due-diligence-guides-customer-type/initial-cdd-trust"
+    },
+    "austrac-delayed-cdd": {
+      "bytes": 1235213,
+      "discovered": false,
+      "fetched_at": "2026-09-30T16:17:02.315288+00:00",
+      "file": "kb/manual/austrac-delayed-cdd.html",
+      "sha256": "7f620a411eb54a319eef7b72577f8e85f1f467623f2f9f6c26ef7b4213e209bb",
+      "source": "manual",
+      "title": "Delayed initial customer due diligence",
+      "url": "https://www.austrac.gov.au/industry-and-business/obligations-and-guidance/your-amlctf-program/customer-due-diligence/initial-customer-due-diligence/delayed-initial-customer-due-diligence"
+    },
+    "austrac-ecdd": {
+      "bytes": 1326005,
+      "discovered": false,
+      "fetched_at": "2026-09-30T16:17:02.317683+00:00",
+      "file": "kb/manual/austrac-ecdd.html",
+      "sha256": "04be9c061da94b4b527217fd4f410fbfe2cb46473b54f170fec6ebfb07e80f1c",
+      "source": "manual",
+      "title": "Enhanced customer due diligence",
+      "url": "https://www.austrac.gov.au/industry-and-business/obligations-and-guidance/your-amlctf-program/customer-due-diligence/enhanced-customer-due-diligence"
+    },
+    "austrac-foreign-pep-example": {
+      "bytes": 1211638,
+      "discovered": false,
+      "fetched_at": "2026-09-30T16:17:02.322347+00:00",
+      "file": "kb/manual/austrac-foreign-pep-example.html",
+      "sha256": "93efff12acefe2e7a68a5fdfa63d5ff7041b380b680660deba76da8b0e51bb07",
+      "source": "manual",
+      "title": "Foreign PEP example",
+      "url": "https://www.austrac.gov.au/industry-and-business/obligations-and-guidance/your-amlctf-program/customer-due-diligence/politically-exposed-persons/foreign-pep-example"
+    },
+    "austrac-high-risk-countries": {
+      "bytes": 1217423,
+      "discovered": false,
+      "fetched_at": "2026-09-30T16:17:02.334109+00:00",
+      "file": "kb/manual/austrac-high-risk-countries.html",
+      "sha256": "8430e716a68463f47f17e9d822f3235b85bf3293654d8a662a01470478bfd7b1",
+      "source": "manual",
+      "title": "High-risk countries, regions and groups",
+      "url": "https://www.austrac.gov.au/industry-and-business/obligations-and-guidance/additional-guidance/high-risk-countries-regions-and-groups"
+    },
+    "austrac-initial-cdd": {
+      "bytes": 1256797,
+      "discovered": false,
+      "fetched_at": "2026-09-30T16:17:02.292833+00:00",
+      "file": "kb/manual/austrac-initial-cdd.html",
+      "sha256": "857b43bad31c353450aa1416c0b5d33e3cb9726d303230b417696fd2628c2ad9",
+      "source": "manual",
+      "title": "Overview of initial customer due diligence",
+      "url": "https://www.austrac.gov.au/industry-and-business/obligations-and-guidance/your-amlctf-program/customer-due-diligence/initial-customer-due-diligence/overview-initial-customer-due-diligence"
+    },
+    "austrac-ongoing-cdd": {
+      "bytes": 1238042,
+      "discovered": false,
+      "fetched_at": "2026-09-30T16:17:02.324912+00:00",
+      "file": "kb/manual/austrac-ongoing-cdd.html",
+      "sha256": "28e4797a7da5714872ab6fb620d4154d9f08b264211d6dfc4b66670a23a9d473",
+      "source": "manual",
+      "title": "Overview of ongoing customer due diligence",
+      "url": "https://www.austrac.gov.au/industry-and-business/obligations-and-guidance/your-amlctf-program/customer-due-diligence/ongoing-customer-due-diligence/overview-ongoing-customer-due-diligence"
+    },
+    "austrac-pep": {
+      "bytes": 1250392,
+      "discovered": false,
+      "fetched_at": "2026-09-30T16:17:02.319998+00:00",
+      "file": "kb/manual/austrac-pep.html",
+      "sha256": "7157787403c8d682a051ea573327f4cd2f60b5ab16efe49f927a391e13ad891f",
+      "source": "manual",
+      "title": "Politically exposed persons (PEP)",
+      "url": "https://www.austrac.gov.au/industry-and-business/obligations-and-guidance/your-amlctf-program/customer-due-diligence/politically-exposed-persons-pep"
+    },
+    "austrac-reliance": {
+      "bytes": 1310939,
+      "discovered": false,
+      "fetched_at": "2026-09-30T16:17:02.331467+00:00",
+      "file": "kb/manual/austrac-reliance.html",
+      "sha256": "bf76568abbd11c1c6eed9f0f469f831bbeb4e684818b221fdf7d5118f54ca210",
+      "source": "manual",
+      "title": "Reliance under customer due diligence arrangements",
+      "url": "https://www.austrac.gov.au/industry-and-business/obligations-and-guidance/your-amlctf-program/customer-due-diligence/reliance-customer-identification-third-party/reliance-under-customer-due-diligence-arrangements"
+    },
+    "austrac-risk-ratings": {
+      "bytes": 1313603,
+      "discovered": false,
+      "fetched_at": "2026-09-30T16:17:02.327083+00:00",
+      "file": "kb/manual/austrac-risk-ratings.html",
+      "sha256": "150e877bfa5cfcbd5997395c0efaab9dbbc3c0108cb0893eef8299cf839f6c66",
+      "source": "manual",
+      "title": "Assigning customer risk ratings",
+      "url": "https://www.austrac.gov.au/industry-and-business/obligations-and-guidance/your-amlctf-program/customer-due-diligence/assigning-customer-risk-ratings"
+    },
+    "austrac-transitioning": {
+      "bytes": 1302997,
+      "discovered": false,
+      "fetched_at": "2026-09-30T16:17:02.329332+00:00",
+      "file": "kb/manual/austrac-transitioning.html",
+      "sha256": "3510d2eb03f5ba74ba737be9a510dd6ad71bc68a1ce21b13b5e3058fe3b50b5b",
+      "source": "manual",
+      "title": "Transitioning existing customers",
+      "url": "https://www.austrac.gov.au/industry-and-business/obligations-and-guidance/your-amlctf-program/customer-due-diligence/transitioning-existing-customers"
+    },
+    "rules2025": {
+      "bytes": 753483,
+      "discovered": false,
+      "fetched_at": "2026-09-30T15:23:03.764294+00:00",
+      "file": "kb/manual/rules2025.pdf",
+      "sha256": "d024fe231a39cf3601bd91de84a99645957e6901a03983eb56b0ed8b95381ff7",
+      "source": "manual",
+      "title": "Anti-Money Laundering and Counter-Terrorism Financing Rules 2025",
+      "url": "https://www.legislation.gov.au/F2025L01026/2026-03-31/2026-03-31/text/original/pdf"
+    }
+  },
+  "last_fetch": "2026-09-30T16:38:57.863857+00:00",
+  "snapshot_created": "2026-09-30T16:17:46.520634+00:00"
+}

@@ -50,7 +50,7 @@ Key design choices (each is switchable in `config.yaml`, and the evaluation abla
 - **Contextual header.** Each chunk is embedded with its citation and heading path prepended, so a bare list of KYC fields still matches "trust customer".
 - **Embedding prompt format.** Each embedding model expects its own format, and leaving it out noticeably hurts retrieval. Qwen3-Embedding gets a task instruction on queries only (`Instruct: …\nQuery:`); formats for nomic-embed-text, EmbeddingGemma and mxbai are also in `config.yaml → embedding.prompt_formats`, picked automatically by model name. Each embedding model gets its own index folder under `.index/chroma/`, so switching never mixes vectors.
 - **Hybrid retrieval.** Legal text rewards exact terms ("source of wealth", "6-18"); BM25 catches those, dense retrieval catches paraphrase. Fused with reciprocal rank fusion.
-- **Fact extraction.** An 8B model reading a long scenario can miss the one decisive fact. The model first extracts a fixed set of CDD facts (PEP status, jurisdiction, SMR, risk rating…); each positive fact becomes a targeted sub-query, and the facts feed the guardrails.
+- **Fact extraction.** An 8B model reading a long scenario can miss the one decisive fact. The model first extracts a fixed set of CDD facts (PEP status, jurisdiction, SMR, risk rating…); each positive fact becomes a targeted sub-query, and the facts feed the guardrails. Each sub-query keeps its best passage in the final set, so a passage that several queries agree on can't crowd out the one rule a single targeted query was looking for. Reasoning is typed (scenario fact / rule / conclusion) and each kind is checked against its own evidence. If a short scenario describes no customer at all, no tier is given.
 - **Structured output.** Ollama JSON-schema constrained generation, `temperature 0`, fixed seed, `num_ctx 8192`. Ollama's default context window silently truncates prompts with 8 sources. Qwen 3.5's "thinking" phase is switched off (`generation.think: false`): it is slow and its reasoning can leak into the JSON.
 - **Verification.** Model citations are mapped back to retrieved chunks; labels that weren't retrieved are removed; each point's lexical support in its cited text is scored; confidence can only go down from what the model claims.
 - **Guardrails.** Under-applying CDD is the costly error. If the scenario contains a mandatory ECDD trigger (foreign PEP, FATF call-for-action jurisdiction, SMR with continuing relationship, nested services, unusual transaction, high risk rating) and the model said otherwise, the tier is escalated to `enhanced` **only if a retrieved source covers the trigger**, and that source is cited. The answer is flagged for review.
@@ -88,13 +88,15 @@ amlrag doctor                  # checks Ollama, models, snapshot, index
 **1. Build the knowledge base (once per snapshot)**
 
 ```bash
-amlrag fetch                   # downloads AUSTRAC CDD guidance + crawls in-scope sub-pages; writes kb/snapshot.lock.json
+amlrag fetch                   # downloads the sources in kb/sources.yaml; writes kb/snapshot.lock.json
 ```
 
-Then put the legislation in `kb/manual/` (the Federal Register's download links change with each compilation, so these are placed by hand):
+AUSTRAC's site timed out automated requests in testing. If `fetch` reports timeouts, open each AUSTRAC page listed in `kb/sources.yaml` in a browser, save it as "Web Page, HTML Only" to `kb/manual/<id>.html` (e.g. `kb/manual/austrac-pep.html`) and run `amlrag fetch` again; manual files always take precedence. (The optional crawl of AUSTRAC sub-pages is off for the same reason; see `crawl` in `kb/sources.yaml`.)
 
-- `kb/manual/rules2025.pdf`: latest compilation of the AML/CTF Rules 2025 from <https://www.legislation.gov.au/F2025L01026/latest> (it must include the 2026 amendments).
-- `kb/manual/amlctf-act.pdf` *(optional, recommended)*: latest compilation of the AML/CTF Act 2006 from <https://www.legislation.gov.au/C2004A01550/latest>.
+Then put the legislation in `kb/manual/` if `fetch` could not download it:
+
+- `kb/manual/rules2025.pdf`: the AML/CTF Rules 2025, Compilation No. 1 (F2026C00274, 31 March 2026, includes the 2026 amendments), from <https://www.legislation.gov.au/F2025L01026/2026-03-31/downloads>. `amlrag fetch` tries this download itself; place the file by hand if it fails. If a newer compilation is registered, update `url` in `kb/sources.yaml` to match the file.
+- `kb/manual/amlctf-act.pdf` *(optional, recommended)*: latest compilation of the AML/CTF Act 2006 from <https://www.legislation.gov.au/C2006A00169/latest/downloads>.
 
 ```bash
 amlrag fetch                   # records the manual files in the lock too
@@ -131,6 +133,8 @@ Each run writes `predictions.jsonl`, `metrics.json`, `config_used.yaml` and a `r
 
 The full gold set is 74 items. On a laptop with the LLM judge, budget roughly a minute per item per preset; `--preset all` runs five presets, so start it before a break or use `--judge lexical` while iterating.
 
+**Adversarial tests.** `data/gold/adversarial.jsonl` holds hand-made trick cases (a denied fact the answer must not call unknown, a FATF grey-list country, a trigger whose measures are risk-based). Run them with `amlrag eval --gold data/gold/adversarial.jsonl`; they are kept out of the main 74 so results stay comparable across versions.
+
 **4. Tests**
 
 ```bash
@@ -154,11 +158,11 @@ amlrag eval --preset full                        # qwen3.5:9b from config.yaml
 amlrag compare results/<llama run> results/<qwen run>
 ```
 
-Results folders are named after the preset and model (e.g. `20261002-1410-full-qwen3.5-9b`), and `amlrag compare` puts any finished runs side by side, warning if they used different indexes or item counts. `--model` also works with `ask` and `serve`.
+Results folders are named after the preset and model (e.g. `20261002-1410-full-qwen3.5-9b`), and `amlrag compare` puts any finished runs side by side, warning if they used different indexes or item counts. After correcting gold items, `amlrag rescore results/<run>` re-scores a finished run's saved answers against the corrected gold set without re-running the model (see [docs/evaluation.md](docs/evaluation.md)). `--model` also works with `ask` and `serve`.
 
 - **Judge.** `eval.judge_model` stays `llama3.1:8b`, a different model family from the answer model, so answers aren't graded by the model that wrote them. If you evaluate with `--model llama3.1:8b`, switch the judge (e.g. `--judge lexical`, or `judge_model: qwen3.5:9b`) for that run.
 - **Memory.** On a 16 GB Mac the answer model and the judge don't both fit at once, so Ollama swaps them during evaluation. It works, just slower; `--judge lexical` avoids it while iterating. With 32 GB+, `qwen3.5:27b` is a large step up.
-- **Thinking.** `generation.think: false` switches off Qwen 3.5's reasoning phase. Set it to `null` to leave the model's default. Models that can't think ignore it; if your Ollama version rejects it, the client drops it automatically.
+- **Thinking.** `generation.think: false` switches off Qwen 3.5's reasoning phase. Set it to `null` to leave the model's default. Models that can't think ignore it; if your Ollama version rejects it, the client drops it automatically. To measure what thinking adds, run `amlrag eval --think` (also works with `ask` and `serve`): it switches thinking on, raises `num_predict` to 4096 and `num_ctx` to 12288 so the reasoning fits, and names the run `…qwen3.5-9b-think…` so it doesn't replace the normal run. Expect each answer to take several times longer.
 
 ### Embedding model
 
@@ -175,6 +179,27 @@ amlrag compare results/<qwen3-embedding run> results/<nomic run>
 Look at `retrieval_recall_at_k` and `walert_ndcg_at_5` first; those isolate search quality. After switching embedding models, recalibrate `retrieval.min_dense_similarity` (see `docs/evaluation.md`): similarity scores sit in different ranges for different models.
 
 **Memory on a 16 GB Mac:** the embedding model (4.7 GB) and the answer model (6.6 GB) don't both fit in the memory macOS gives the GPU, so Ollama loads one, then the other, for each question. Answers still work but each takes several seconds longer. If that's too slow for the demo, `--embedding-model qwen3-embedding:4b` (2.5 GB, rebuild its index first) fits alongside the answer model.
+
+## Sharing the app
+
+By default `amlrag serve` listens on `127.0.0.1:8000`, so only this computer can open it. Everything (the models, the index, the query log) stays on this machine, which is the privacy design: sharing the app means sharing access to this computer's assistant, so the computer must be on, awake and running Ollama while others use it. Answers are processed one after another, so several people asking at once will wait in turn.
+
+**1. Turn on sign-in first.** Without it, anyone with the address can use the models and read the Review gaps log. Set the passwords as environment variables (never in `config.yaml`):
+
+```bash
+export AMLRAG_SERVER__PASSWORD='choose-a-team-password'           # everyone signs in as "cdd"
+export AMLRAG_SERVER__MANAGER_PASSWORD='choose-a-manager-password' # optional: only "manager" sees Review gaps
+amlrag serve
+```
+
+**2. Give it a public address with a tunnel.** A tunnel forwards a public HTTPS address to `localhost:8000`; no router or firewall changes are needed.
+
+- *Stable address:* [Tailscale Funnel](https://tailscale.com/docs/reference/tailscale-cli/funnel) (free account). Install Tailscale, sign in, then `tailscale funnel --bg --https=443 localhost:8000`. The app is then at `https://<your-mac>.<your-tailnet>.ts.net` and stays shared across restarts; `tailscale funnel --https=443 off` stops it. The first run may ask you to enable Funnel for your tailnet.
+- *One-off demo, no account:* [Cloudflare quick tunnel](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/do-more-with-tunnels/trycloudflare/). Install `cloudflared` and run `cloudflared tunnel --url http://localhost:8000`; it prints a random `https://….trycloudflare.com` address that changes every time and comes with no uptime guarantee.
+
+**3. Keep it running without Terminal.** Run `amlrag serve` from a LaunchAgent with `RunAtLoad` and `KeepAlive` set to `true`, so it starts at login and restarts if it stops. The app starts Ollama itself when someone opens the site and Ollama isn't running (`ollama.autostart` in `config.yaml`): the Ollama app on a Mac, otherwise `ollama serve`. Add Tailscale to *System Settings → General → Login Items*, and turn on *System Settings → Battery → Options → Prevent automatic sleeping on power adapter when the display is off*. The Mac must stay plugged in with the lid open, and after a restart someone has to log in once.
+
+For an always-on deployment that doesn't depend on this computer, the app and Ollama would move to a server with a GPU; that is outside this prototype.
 
 ## Working without Ollama (frontend work, CI)
 
