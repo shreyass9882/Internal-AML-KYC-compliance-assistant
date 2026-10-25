@@ -28,7 +28,9 @@ def write_report(path: Path, items: list[GoldItem], preds: dict[str, dict], m: d
     L.append(f"- Answer instructions: prompt version {run.get('prompt_version') or '1'}")
     L.append(f"- Gold file: `{run.get('gold_file')}`: {run.get('n_items')} items "
              f"({run.get('gold_status', {}).get('reviewed', 0)} reviewed, {run.get('gold_status', {}).get('draft', 0)} draft)")
-    L.append(f"- Duration: {run.get('duration_s')} s; finished {run.get('finished')}\n")
+    phases = (f" (answering {run['answer_phase_s']} s, then grading {run['grading_phase_s']} s)"
+              if run.get("answer_phase_s") is not None else "")
+    L.append(f"- Duration: {run.get('duration_s')} s{phases}; finished {run.get('finished')}\n")
     if run.get("rescored_from"):
         L.append(f"> **Rescored** on {run.get('rescored_at')}: the answers are those of run `{run.get('rescored_from')}`, "
                  f"scored again against the current gold set (digest `{run.get('gold_digest')}`).\n")

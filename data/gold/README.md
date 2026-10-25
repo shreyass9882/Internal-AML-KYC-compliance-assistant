@@ -7,13 +7,20 @@
 - **8 plain-language explanation questions.**
 - **7 out-of-knowledge-base questions** the assistant should decline (Walert's out-of-KB category).
 
-**Adversarial set (`adversarial.jsonl`, 4 items, added 3 October 2026).** Hand-made trick cases kept apart from the 74 so earlier runs stay comparable. Run them with `amlrag eval --gold data/gold/adversarial.jsonl`.
+**Adversarial set (`adversarial.jsonl`, 8 items).** Hand-made trick cases kept apart from the 74 so earlier runs stay comparable. Double-click **Run trick tests** in the project folder, or run `amlrag eval --gold data/gold/adversarial.jsonl`.
 
-- **A01 / A04:** payments to suppliers in a FATF call-for-action country. In A01 the scenario says the owners and agents are *not* there; in A04 it says nothing about them. The assistant must treat A01's denied facts as false, not missing (the report's "Answer checks" counts answers that don't), and may list A04's as missing.
+- **A01 / A04 / A05:** payments to suppliers in a FATF call-for-action country. In A01 and A05 the scenario says the owners and agents are *not* there; in A04 it says nothing about them. The assistant must treat denied facts as false, not missing (the report's "Answer checks" counts answers that don't), and may list A04's as missing. A05 (added with prompt v3.3) also says no other trigger is identified, so a payments-only answer of enhanced CDD fails.
 - **A02:** a FATF grey-list country, which is not a call-for-action country.
 - **A03:** a mandatory trigger. The answer should mark example measures as risk-based options, not as all required.
+- **A06** (added 5 October 2026): a company with the jurisdiction trigger ruled out and nothing else known, not even PEP status or a risk rating. Standard is the best answer, with those two listed as missing; "cannot determine" is also accepted; enhanced fails.
+- **A07** (added 5 October 2026): the application and the identity documents disagree about where the beneficial owner lives. The assistant should say the facts conflict and decline to pick a tier. It has no contradiction check yet, so this item is expected to fail until one is added.
+- **A08** (added 5 October 2026): the deadline for a suspicious matter report, which the knowledge base doesn't give. The assistant must decline rather than answer from memory.
 
-A01 and A03 failed under prompt v3.1, and prompt v3.2 was written to fix them: the tests came first.
+A01 and A03 failed under prompt v3.1, and prompt v3.2 was written to fix them: the tests came first. A06–A08 and the retrieval set below came from a review of ChatGPT's suggested tests on 5 October 2026; its A1–A4 were already covered by A01–A05 and its A8 (citations that don't support the claim) is the citation precision every run reports.
+
+**Retrieval stress set (`retrieval-stress.jsonl`, 8 Explain items, added 5 October 2026).** R01–R08 each map to specific sections of the guidance or the Rules, so they test the retriever as much as the model: Recall@8, MRR, citation precision and key-fact recall. Double-click **Run retrieval tests**, or run `amlrag eval --gold data/gold/retrieval-stress.jsonl`. R04 is a paraphrase of E10 scored per trigger (each of AUSTRAC's six "When you must apply enhanced CDD" sections is a separate reference); R06's second half is inferred, because the knowledge base never names FATF's increased-monitoring list. Several items (R01, R04, R07, R08) are lists, and their key facts check that the answer keeps every item.
+
+**Results by item.** Both launchers finish with one line per test, also saved as `items.md` next to the run's `report.md`. For any run: `python -m amlrag.eval.items results/<run> --gold <file>`. An Explain item passes there when it answers, finds at least one expected passage in the top 8 and contains at least 60% of its key facts.
 
 **Every item is `status: draft`.** The expected answers were drafted from secondary summaries of Part 6 of the AML/CTF Rules 2025 and the structure of AUSTRAC's CDD guidance. Before reporting results, a team member should check each item against the **locked snapshot** and mark it reviewed.
 
@@ -21,7 +28,7 @@ A01 and A03 failed under prompt v3.1, and prompt v3.2 was written to fix them: t
 
 | Field | Meaning |
 |---|---|
-| `id` | Unique, descriptive (`D02-foreign-pep-beneficial-owner`). `D` = determine, `E` = explain, `U` = unanswerable. |
+| `id` | Unique, descriptive (`D02-foreign-pep-beneficial-owner`). `D` = determine, `E` = explain, `U` = unanswerable, `A` = adversarial set, `R` = retrieval stress set. |
 | `mode` | `determine` or `explain`. |
 | `query` | The scenario or question, written the way a compliance officer would type it. |
 | `answerable` | `false` if the knowledge base cannot or should not answer it. |

@@ -24,7 +24,7 @@ def test_ruled_out_facts_reach_the_prompt_as_established():
     assert "Ruled out by the scenario (established as false, not missing)" in user
     assert "FATF call-for-action country" in user
     assert "Never say the scenario does not state it" in DETERMINE_SYSTEM
-    assert '"regardless"' in DETERMINE_SYSTEM and PROMPT_VERSION == "3.2"
+    assert '"regardless"' in DETERMINE_SYSTEM and PROMPT_VERSION >= "3.2"
 
 
 def test_answer_calling_a_ruled_out_fact_unknown_is_flagged_not_removed():
@@ -65,9 +65,15 @@ def test_adversarial_set_loads():
     path = Path(__file__).resolve().parents[1] / "data" / "gold" / "adversarial.jsonl"
     items = {i.id: i for i in load_gold(path)}
     assert set(items) == {"A01-payments-only-ruled-out", "A02-grey-list-not-call-for-action",
-                          "A03-call-for-action-measures-risk-based", "A04-payments-only-unknown"}
+                          "A03-call-for-action-measures-risk-based", "A04-payments-only-unknown",
+                          "A05-payments-only-no-other-trigger", "A06-customer-known-no-other-trigger-info",
+                          "A07-contradictory-beneficial-owner-location", "A08-smr-deadline-out-of-kb"}
     assert items["A03-call-for-action-measures-risk-based"].mandatory_ecdd
     assert "enhanced" not in items["A01-payments-only-ruled-out"].acceptable
+    assert "enhanced" not in items["A06-customer-known-no-other-trigger-info"].acceptable
+    # A07's facts contradict each other and A08 is outside the knowledge base: both must be declined.
+    assert not items["A07-contradictory-beneficial-owner-location"].answerable
+    assert items["A08-smr-deadline-out-of-kb"].category == "out_of_kb"
 
 
 def test_adversarial_run_reports_answer_checks(built_cfg, tmp_path):
@@ -75,6 +81,6 @@ def test_adversarial_run_reports_answer_checks(built_cfg, tmp_path):
 
     path = Path(__file__).resolve().parents[1] / "data" / "gold" / "adversarial.jsonl"
     out_dir, metrics = run_eval(built_cfg, gold_path=str(path), verbose=False, out_dir=tmp_path / "adv")
-    assert metrics["n_items"] == 4
+    assert metrics["n_items"] == 8
     assert "answers_calling_ruled_out_fact_unknown" in metrics["attribution"]
     assert "## Answer checks" in (out_dir / "report.md").read_text()

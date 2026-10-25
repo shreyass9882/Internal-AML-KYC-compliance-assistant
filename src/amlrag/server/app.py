@@ -20,17 +20,28 @@ log = logging.getLogger(__name__)
 STATIC = Path(__file__).parent / "static"
 
 EXAMPLES = {
+    # The first chip in each tab is the scenario from the video demo, so a live demo is one click.
+    # The SMSF example was removed: a customer's "we're regulated" claim once talked the model into
+    # leniency (see the AI reflection slide), so it is not a safe live example.
     "determine": [
-        {"label": "Foreign PEP", "text": "An individual customer tells us she is a serving deputy minister of finance "
-                                         "in a foreign country and wants to open a savings account."},
+        {"label": "Owner in high-risk country",
+         "text": "A customer is incorporated in Australia. Its beneficial owner is physically located in a "
+                 "jurisdiction that FATF has called for enhanced CDD to be applied. The customer itself has no "
+                 "other identified high-risk characteristics. What CDD tier should apply, and why?"},
         {"label": "Café company", "text": "An Australian proprietary company that runs a café opens a business "
                                           "account. Two directors own 50% each. Medium risk, no PEP matches."},
+        {"label": "Foreign PEP", "text": "An individual customer tells us she is a serving deputy minister of finance "
+                                         "in a foreign country and wants to open a savings account."},
         {"label": "Government dept", "text": "A Commonwealth government department opens an account to receive "
                                               "fees. We rate the ML/TF risk as low."},
-        {"label": "SMSF", "text": "The trustees of an ATO-registered self-managed super fund ask us not to identify "
-                                  "the fund's beneficial owners because it is regulated. Risk is low."},
     ],
     "explain": [
+        {"label": "Every extra check?",
+         "text": "A customer is formed in a FATF high-risk jurisdiction, so Enhanced CDD is mandatory. An analyst "
+                 "asks: “Does this mean we automatically have to perform every possible enhanced CDD measure "
+                 "on the customer, regardless of its individual circumstances?” Explain the correct "
+                 "interpretation of AUSTRAC's guidance and distinguish between the mandatory trigger and the "
+                 "measures that should be applied."},
         {"label": "SoW vs SoF", "text": "What is the difference between source of wealth and source of funds?"},
         {"label": "Trust KYC", "text": "What KYC information do we need to collect for a trust customer?"},
         {"label": "Delayed CDD", "text": "When can we delay verifying a customer's identity?"},

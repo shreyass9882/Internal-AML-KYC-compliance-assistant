@@ -23,7 +23,7 @@ from amlrag.generate.prompts import (
     explain_messages,
 )
 from amlrag.generate.references import check_reference, parse_references
-from amlrag.generate.verify import cap_confidence, verify
+from amlrag.generate.verify import cap_confidence, verify, enforce_required_wording
 from amlrag.index.store import VectorStore
 from amlrag.ingest.build import read_chunks
 from amlrag.ingest.fetch import snapshot_date
@@ -81,6 +81,19 @@ def undescribed_customer(facts: dict[str, Any] | None, scenario: str) -> bool:
     any_trigger = any(v is True for v in facts.values())
     return (facts.get("customer_type") in (None, "unknown") and facts.get("ml_tf_risk") in (None, "unknown")
             and facts.get("pep_status") in (None, "unknown", "none") and not any_trigger)
+
+
+UNSUPPORTED_ENHANCED_WARNING = (
+    "Enhanced CDD was given, but none of the facts found in the scenario is an enhanced CDD trigger and the scenario "
+    "states no ML/TF risk rating. Check the reasoning against the scenario before relying on it.")
+
+
+def unsupported_enhanced(tier: str, fired: list[str], facts: dict[str, Any] | None) -> bool:
+    """Enhanced with nothing in the scenario to justify it: no trigger fact and no stated risk rating (v3.3)."""
+    return (tier == "enhanced" and not fired and bool(facts)
+            and facts.get("risk_rating_stated") is False and facts.get("ml_tf_risk") in (None, "unknown"))
+
+
 CLOSED_BOOK_WARNING = ("Closed-book baseline: this answer comes from the model's own training with no retrieved "
                        "sources. Its references were checked only for whether the section exists in the snapshot.")
 EXPLAIN_GROUPS = {"key_points": "point"}
@@ -228,6 +241,8 @@ class Assistant:
         elif guard["escalated"]:
             flag_reason = FLAG_ESCALATED
 
+        if not abstained and unsupported_enhanced(final_tier, guard["fired"], facts):
+            warnings.append(UNSUPPORTED_ENHANCED_WARNING)
         missing = [str(m) for m in out.get("missing_information", [])]
         called_unknown = ruled_out_called_unknown(
             facts, [p.text for p in ver.points.get("reasoning", [])] + [str(out.get("summary", ""))], missing)
@@ -235,6 +250,7 @@ class Assistant:
             warnings.append("The answer treats something the scenario rules out as unknown. Check it against the "
                             "scenario: " + "; ".join(f'"{t[:90]}"' for t in called_unknown[:2]))
         measures = ver.points.get("required_measures", [])
+        required_downgraded = enforce_required_wording(measures, label_map)
 
         points = [{"group": g, **p.to_dict(label_map)} for g, ps in ver.points.items() for p in ps]
         timings["total_s"] = round(time.perf_counter() - t_start, 3)
@@ -257,7 +273,8 @@ class Assistant:
                        "supported_points": len(ver.all_points) - len(ver.unsupported),
                        "ruled_out_called_unknown": len(called_unknown) if not undescribed else 0,
                        "required_measures": sum(1 for p in measures if p.required is True),
-                       "optional_measures": sum(1 for p in measures if p.required is False)},
+                       "optional_measures": sum(1 for p in measures if p.required is False),
+                       "required_downgraded": required_downgraded},
             "timings": timings, "llm_stats": stats,
             "models": {"embedder": self.embedder_name, "generator": getattr(self.llm, "name", "?")},
             "snapshot": self.snapshot, "offline_stub": self.offline_stub, "prompt_version": PROMPT_VERSION,

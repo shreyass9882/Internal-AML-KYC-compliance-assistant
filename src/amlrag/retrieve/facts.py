@@ -21,6 +21,8 @@ as established, not missing.
 """
 from __future__ import annotations
 
+import re
+
 import logging
 from typing import Any
 
@@ -98,7 +100,9 @@ Field meanings:
 - regulated_or_government: the customer is, or is controlled by, a government body, a listed public company, a
   strata owners corporation, or an entity licensed or registered as a bank, insurer, APRA-regulated super fund or
   financial services licensee.
-- ml_tf_risk: the risk rating the scenario gives or clearly describes. Don't infer it from PEP status alone.
+- ml_tf_risk: only a risk rating the scenario states in words ("medium risk", "we rate the ML/TF risk as low",
+  "rated high risk"). Never infer it from countries, payments, transactions, PEP status or any other fact: if the
+  scenario states no rating, "unknown".
 - delayed_verification: the scenario asks about providing the service before verification is complete.
 - missing_information: up to three facts that are not in the scenario and would change the CDD tier (short phrases).
   Leave it empty when the scenario has what is needed."""
@@ -179,13 +183,48 @@ def normalise_facts(raw: dict[str, Any]) -> dict[str, Any]:
     return facts
 
 
+# A customer risk rating stated in words: "medium risk", "high ML/TF risk", "low-risk customer",
+# "risk is low", "rate the ML/TF risk as high". Not a risky *thing*: "high-risk jurisdiction",
+# "high risk country", "no other high-risk characteristics" describe countries or features, not
+# the customer's rating.
+_LEVEL = r"(?:low|medium|moderate|high)"
+_THINGS = (r"(?:jurisdiction|countr|region|area|third|factor|characteristic|indicator|industr|sector|product|"
+           r"service|transaction|activit|feature|situation|circumstance|location)")
+# after a level word: not "high-risk jurisdiction", "high risk country", "high-risk characteristics"
+_NOT_A_THING = rf"(?![- ]?(?:ml/?tf[- ])?risk\s+{_THINGS})(?!\s*{_THINGS})"
+_RISK_RATING = (
+    # "medium risk", "high ML/TF risk", "low-risk customer"
+    re.compile(rf"\b{_LEVEL}[- ](?:ml/?tf[- ]|money[- ]laundering[- ])?risk\b(?!\s*{_THINGS})", re.I),
+    # "risk is low", "ML/TF risk as high", "risk rating medium", "risk rating: high", "risk level of low"
+    re.compile(rf"\brisk(?:[- ]rating| level| profile)?\s*(?::|-|=|\bis\b|\bas\b|\bof\b|\bwas\b|\bremains\b|"
+               rf"\bat\b|(?<=rating))\s*(?:currently\s+|now\s+|assessed\s+as\s+|rated\s+(?:as\s+)?)?"
+               rf"{_LEVEL}\b{_NOT_A_THING}", re.I),
+    # "we rate it medium", "rates the customer as high ML/TF risk", "assessed as low"
+    re.compile(rf"\b(?:rate|rates|rated|assess|assesses|assessed)\s+(?:\w+\s+){{0,3}}?(?:as\s+)?{_LEVEL}\b"
+               rf"{_NOT_A_THING}", re.I),
+)
+
+
+def risk_rating_stated(text: str) -> bool:
+    """True when the text states the customer's ML/TF risk rating in words."""
+    return any(p.search(text or "") for p in _RISK_RATING)
+
+
 def extract_facts(llm, scenario: str) -> tuple[dict[str, Any] | None, dict[str, Any]]:
     try:
         raw, stats = llm.chat_json(facts_messages(scenario), FACTS_SCHEMA, task="facts")
-        return normalise_facts(raw), stats
+        facts = normalise_facts(raw)
     except Exception as exc:  # fact extraction is an enhancement; never fatal
         log.warning("fact extraction failed: %s", exc)
         return None, {"error": str(exc)}
+    # Evidence check (prompt v3.3): a rating the scenario never states was inferred by the model,
+    # e.g. "pays suppliers in a FATF high-risk country" read as "ML/TF risk: high", which then fired
+    # the high-risk guardrail. Only a stated rating counts; otherwise the risk is unknown.
+    facts["risk_rating_stated"] = risk_rating_stated(scenario)
+    if facts.get("ml_tf_risk") in ("low", "medium", "high") and not facts["risk_rating_stated"]:
+        log.info("ignored unstated ML/TF risk rating %r", facts["ml_tf_risk"])
+        facts["ml_tf_risk"] = "unknown"
+    return facts, stats
 
 
 _CTYPE_QUERY = {

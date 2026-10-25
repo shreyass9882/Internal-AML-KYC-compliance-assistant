@@ -25,7 +25,10 @@ from amlrag.retrieve.facts import RULED_OUT_LABELS
 #      never to call them unstated; each measure says whether a source requires it or gives it as
 #      a risk-based option; a trigger applying does not mean every enhanced measure is required.
 #      Found by adversarial tests A01-A03 (data/gold/adversarial.jsonl).
-PROMPT_VERSION = "3.2"
+#   3.3: the customer's ML/TF risk counts only when the scenario states a rating (fact extraction
+#      plus a code check); when none is stated the answer model is told so; a measure stays
+#      "required" only if its cited source uses mandatory wording. Found by adversarial test A05.
+PROMPT_VERSION = "3.3"
 
 RETRY_UNCITED = """Your answer has no points that cite the SOURCES, so it cannot be shown to the user. Return the same JSON object again with the points filled in, each citing the source labels that state it. If the sources really do not answer this, say so as the instructions describe."""
 
@@ -112,7 +115,7 @@ DETERMINE_SYSTEM = f"""You help compliance officers at an Australian AML/CTF rep
 Rules:
 {_COMMON_RULES}
 - The FACTS block was extracted automatically and may be wrong. Where it differs from the SCENARIO, follow the SCENARIO.
-- A fact the SCENARIO denies ("is not a PEP", "no links to high-risk countries", "none of them is located there") is established as false. Never say the scenario does not state it, and never list it in missing_information. Payments to, or trade with, a country do not show that anyone is located or formed there.
+- A fact the SCENARIO denies ("is not a PEP", "no links to high-risk countries", "none of them is located there") is established as false. Never say the scenario does not state it, and never list it in missing_information. Payments to, or trade with, a country do not show that anyone is located or formed there. The customer's ML/TF risk is high only if the SCENARIO states that rating; a country, payment or other fact does not make it high.
 {_REASONING}
 - When a trigger makes enhanced CDD mandatory, say that the trigger applies. Do not say that every enhanced measure is required or that it applies "regardless" of the customer's circumstances: which measures to use depends on the customer's risk.
 - required_measures: the concrete steps for this customer at this tier (what to collect, verify, establish or approve), each with its sources and a "required" flag. required: true only when a cited source says the step must be done in this situation; required: false when a source gives it as an example or option to match the customer's risk ("may include", "such as", "could"). "Apply enhanced CDD" is not a measure: say what it involves here."""
@@ -145,9 +148,11 @@ def _facts_lines(facts: dict[str, Any] | None) -> str:
         return ""
     lines = []
     for k, v in facts.items():
-        if k in ("missing_information", "ruled_out") or v in (False, "unknown", "none", None, []):
+        if k in ("missing_information", "ruled_out", "risk_rating_stated") or v in (False, "unknown", "none", None, []):
             continue
         lines.append(f"- {k}: {v}")
+    if facts.get("risk_rating_stated") is False:
+        lines.append("- ml_tf_risk: not stated in the scenario (do not assume or infer a rating)")
     ruled_out = [RULED_OUT_LABELS[k] for k in facts.get("ruled_out") or [] if k in RULED_OUT_LABELS]
     if not lines and not ruled_out:
         return ""

@@ -160,3 +160,21 @@ def cap_confidence(model_conf: str, ver: Verification, max_unsupported_share: fl
         notes.append("The model cited sources that were not retrieved; those citations were removed.")
         conf = min(conf, "medium", key=lambda c: _CONF_ORDER[c])
     return conf, notes
+
+
+# Mandatory wording in a source. A measure is "required" only when a cited passage says it must be
+# done; AUSTRAC's lists of enhanced measures say they "may be appropriate", so citing one cannot make
+# a measure mandatory (prompt v3.3; the model kept marking examples as required).
+_MANDATORY = re.compile(r"\b(?:must|are required to|is required to|have to|has to)\b", re.I)
+
+
+def enforce_required_wording(points: list[VerifiedPoint], label_map: dict[str, Retrieved]) -> int:
+    """Set required=False on measures whose cited passages have no mandatory wording. Returns how many."""
+    changed = 0
+    for p in points:
+        if p.required is True:
+            texts = [label_map[l].chunk.text for l in p.labels if l in label_map]
+            if not any(_MANDATORY.search(t) for t in texts):
+                p.required = False
+                changed += 1
+    return changed

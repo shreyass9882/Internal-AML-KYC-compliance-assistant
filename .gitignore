@@ -8,8 +8,6 @@ venv/
 # Built artefacts: rebuild with `amlrag build`
 .index/
 logs/*.db
-results/*
-!results/.gitkeep
 
 # Raw downloads are large; the lock file (kb/snapshot.lock.json) records exactly
 # what was fetched (URL, timestamp, sha256) so the snapshot is reproducible.
@@ -22,3 +20,10 @@ kb/manual/*.html
 .DS_Store
 AML Document.pdf
 logs/*.log
+
+# leftovers from the update kits
+*.before-update-*
+*.before-demo
+Undo update *.command
+CDD update*/
+files/

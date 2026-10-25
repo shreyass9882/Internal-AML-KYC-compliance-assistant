@@ -87,6 +87,11 @@ def _prediction(item: GoldItem, result: dict[str, Any], judge: Judge | None, chu
     }
 
 
+def _error_prediction(item: GoldItem, error: str) -> dict[str, Any]:
+    return {"id": item.id, "mode": item.mode, "tier": None, "abstained": True, "error": error,
+            "retrieved": [], "cited": [], "points": [], "answer_text": "", "checks": {}}
+
+
 def model_slug(cfg: Config) -> str:
     """Short, filesystem-safe name of the answer model, used in results folder names."""
     stub = cfg.generation.backend == "stub"
@@ -160,26 +165,52 @@ def run_eval(cfg: Config, preset: str = "full", gold_path: str | None = None, li
               "Use --judge lexical or set eval.judge_model to a different model family.")
 
     preds: dict[str, dict[str, Any]] = {}
+    results: dict[str, dict[str, Any]] = {}
     t0 = time.perf_counter()
-    with open(out_dir / "predictions.jsonl", "w", encoding="utf-8") as fh:
+    # Phase 1: answer every question first. Grading straight after each answer swaps the judge
+    # model in and out of memory every time (Ollama can't keep the answer, search and judge
+    # models loaded together on a laptop), which slows the whole run and inflates every answer's
+    # timing. Raw answers are saved as they arrive, so nothing is lost if grading fails.
+    if verbose and judge:
+        print(f"Answering {len(items)} questions first, then grading them with {judge.name}.", flush=True)
+    with open(out_dir / "answers.jsonl", "w", encoding="utf-8") as fh:
         for n, item in enumerate(items, start=1):
             try:
                 result = assistant.ask(item.mode, item.query)
-                pred = _prediction(item, result, judge, chunk_text)
             except Exception as exc:  # keep going; the error is reported
                 log.exception("item %s failed", item.id)
-                pred = {"id": item.id, "mode": item.mode, "tier": None, "abstained": True, "error": str(exc),
-                        "retrieved": [], "cited": [], "points": [], "answer_text": "", "checks": {}}
+                result = {"error": str(exc)}
+            results[item.id] = result
+            fh.write(json.dumps({"id": item.id, "result": result}, ensure_ascii=False, default=str) + "\n")
+            fh.flush()
+            if verbose:
+                quick = _error_prediction(item, result["error"]) if "error" in result else \
+                    _prediction(item, result, None, chunk_text)
+                exp = item.expected_tier or ("answerable" if item.answerable else "abstain")
+                got = quick.get("tier") or ("abstained" if quick.get("abstained") else "answered")
+                mark = "ok " if _item_ok(item, quick) else "XX "
+                print(f"  {mark}[{n:>2}/{len(items)}] {item.id:<42} expected={exp:<24} got={got}", flush=True)
+    answer_phase_s = time.perf_counter() - t0
+
+    # Phase 2: grade every saved answer with the judge (its verdicts are cached across runs).
+    t1 = time.perf_counter()
+    if verbose and judge:
+        print(f"Grading {len(items)} answers with {judge.name}…", flush=True)
+    with open(out_dir / "predictions.jsonl", "w", encoding="utf-8") as fh:
+        for n, item in enumerate(items, start=1):
+            result = results[item.id]
+            if "error" in result:
+                pred = _error_prediction(item, result["error"])
+            else:
+                pred = _prediction(item, result, judge, chunk_text)
             preds[item.id] = pred
             fh.write(json.dumps(pred, ensure_ascii=False) + "\n")
             fh.flush()
-            if verbose:
-                exp = item.expected_tier or ("answerable" if item.answerable else "abstain")
-                got = pred.get("tier") or ("abstained" if pred.get("abstained") else "answered")
-                mark = "ok " if _item_ok(item, pred) else "XX "
-                print(f"  {mark}[{n:>2}/{len(items)}] {item.id:<42} expected={exp:<24} got={got}", flush=True)
+            if verbose and judge and (n % 10 == 0 or n == len(items)):
+                print(f"  graded {n}/{len(items)}", flush=True)
     if judge:
         judge.save()
+    grading_phase_s = time.perf_counter() - t1
 
     bert_info = _add_bertscore(cfg, items, preds)
     if bert_info["status"].startswith("computed"):          # rewrite with the scores included
@@ -193,6 +224,8 @@ def run_eval(cfg: Config, preset: str = "full", gold_path: str | None = None, li
     metrics["acceptance"] = check_thresholds(metrics["headline"], cfg.eval.thresholds.to_dict())
     metrics["run"] = {
         "preset": preset, "started": stamp, "duration_s": round(time.perf_counter() - t0, 1),
+        "answer_phase_s": round(answer_phase_s, 1), "grading_phase_s": round(grading_phase_s, 1),
+        "grading": "after all answers",
         "gold_file": str(gold_path or cfg.path("gold_file")), "n_items": len(items),
         "generator": getattr(assistant.llm, "name", "?"), "embedder": assistant.embedder_name,
         "judge": judge.name if judge else "lexical", "judge_same_as_generator": self_graded,
