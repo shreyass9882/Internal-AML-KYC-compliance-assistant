@@ -1,0 +1,333 @@
+{
+  "n_items": 62,
+  "n_counterfactual_variants": 12,
+  "k": 8,
+  "tier": {
+    "n": 45,
+    "accuracy_strict": 0.8,
+    "accuracy_acceptable": 0.8444,
+    "under_application_rate": 0.0222,
+    "over_application_rate": 0.0222,
+    "abstained_rate": 0.1111,
+    "mandatory_ecdd_recall": 0.8095,
+    "macro_f1": 0.8368,
+    "confusion": {
+      "enhanced": {
+        "enhanced": 17,
+        "insufficient_information": 4
+      },
+      "standard": {
+        "standard": 13,
+        "simplified": 1,
+        "insufficient_information": 1,
+        "enhanced": 1
+      },
+      "simplified": {
+        "standard": 2,
+        "simplified": 6
+      }
+    },
+    "accuracy_by_customer_type": {
+      "company": {
+        "n": 9,
+        "accuracy": 0.8889
+      },
+      "government_body": {
+        "n": 5,
+        "accuracy": 1.0
+      },
+      "individual": {
+        "n": 10,
+        "accuracy": 0.7
+      },
+      "other": {
+        "n": 1,
+        "accuracy": 1.0
+      },
+      "partnership": {
+        "n": 3,
+        "accuracy": 1.0
+      },
+      "sole_trader": {
+        "n": 6,
+        "accuracy": 0.8333
+      },
+      "trust": {
+        "n": 7,
+        "accuracy": 0.8571
+      },
+      "unincorporated_association": {
+        "n": 4,
+        "accuracy": 0.75
+      }
+    }
+  },
+  "abstention": {
+    "unanswerable_n": 9,
+    "unanswerable_abstain_rate": 0.8889,
+    "answerable_n": 53,
+    "false_abstain_rate": 0.1887
+  },
+  "retrieval": {
+    "n": 0,
+    "recall_at_8": null,
+    "hit_at_8": null,
+    "mrr": null,
+    "items_without_reachable_refs": []
+  },
+  "attribution": {
+    "citation_validity": 0.9325,
+    "citation_precision_section": 0.0208,
+    "citation_precision_document": 0.39,
+    "citation_recall_section": 0.05,
+    "answers_with_uncited_points": 3
+  },
+  "faithfulness": {
+    "points": 0,
+    "judge_supported_rate": null,
+    "lexical_supported_rate": null,
+    "source_claims_judge_rate": null,
+    "by_kind": {},
+    "judge": "ollama:llama3.1:8b"
+  },
+  "explain": {
+    "n": 8,
+    "key_fact_recall": 0.3438
+  },
+  "consistency": {
+    "groups": 6,
+    "agreement_rate": 0.1667,
+    "all_correct_rate": 0.3333,
+    "detail": {
+      "G-domestic-pep-medium": {
+        "D11-domestic-pep-medium-risk": "standard",
+        "D51-assoc-domestic-pep-treasurer": "enhanced"
+      },
+      "G-foreign-pep": {
+        "D01-foreign-pep-individual": "enhanced",
+        "D02-foreign-pep-beneficial-owner": "enhanced",
+        "D03-foreign-pep-trust-appointor": "enhanced",
+        "D14-foreign-pep-family-member": "insufficient_information",
+        "D41-unit-trust-foreign-pep": "enhanced",
+        "D54-partnership-foreign-pep": "enhanced"
+      },
+      "G-high-risk-jurisdiction": {
+        "D04-high-risk-jurisdiction-company": "enhanced",
+        "D35-government-body-high-risk-jurisdiction": "enhanced",
+        "D42-trust-formed-high-risk": "enhanced",
+        "D44-sole-trader-high-risk-country": "enhanced"
+      },
+      "G-simplified-government": {
+        "D28-commonwealth-department": "standard",
+        "D47-local-council": "standard",
+        "D48-state-owned-corporation": "simplified"
+      },
+      "G-smr": {
+        "D06-smr-continuing-sole-trader": "insufficient_information",
+        "D36-low-risk-individual-smr": "enhanced"
+      },
+      "G-standard-individual": {
+        "D16-standard-individual": "standard",
+        "D17-standard-individual-paraphrase": "simplified"
+      }
+    }
+  },
+  "calibration": {
+    "high": {
+      "n": 40,
+      "accuracy": 0.95
+    },
+    "low": {
+      "n": 5,
+      "accuracy": 0.0
+    }
+  },
+  "latency_s": {
+    "mean": 23.79,
+    "p50": 17.22,
+    "p95": 49.82
+  },
+  "errors": [],
+  "needs_review_rate": 1.0,
+  "walert": {
+    "out_of_kb_n": 7,
+    "pct_unanswered_out_of_kb": 0.8571,
+    "underspecified_n": 2,
+    "pct_unanswered_underspecified": 1.0,
+    "ndcg": {},
+    "rouge1": {
+      "n": 53,
+      "precision": 0.2781,
+      "recall": 0.4099,
+      "f1": 0.2674,
+      "stemmer": false
+    },
+    "bertscore": null
+  },
+  "fairness": {
+    "groups": 4,
+    "variants": 12,
+    "invariance_rate": 1.0,
+    "tier_flip_rate": 0.0,
+    "confidence_flip_rate": 0.0,
+    "variant_accuracy": 0.75,
+    "flips": [],
+    "detail": {
+      "D01-foreign-pep-individual": {
+        "D01-foreign-pep-individual": "enhanced",
+        "D01-cf-new-zealand": "enhanced",
+        "D01-cf-united-kingdom": "enhanced",
+        "D01-cf-india": "enhanced"
+      },
+      "D16-standard-individual": {
+        "D16-standard-individual": "standard",
+        "D16-cf-aisha-rahman": "standard",
+        "D16-cf-nguyen-thi-lan": "standard",
+        "D16-cf-priya-sharma": "standard"
+      },
+      "D17-standard-individual-paraphrase": {
+        "D17-standard-individual-paraphrase": "simplified",
+        "D17-cf-born-india": "simplified",
+        "D17-cf-born-china": "simplified",
+        "D17-cf-born-greece": "simplified"
+      },
+      "D18-sole-trader": {
+        "D18-sole-trader": "standard",
+        "D18-cf-mohammed-hassan": "standard",
+        "D18-cf-tran-van-minh": "standard",
+        "D18-cf-kwame-mensah": "standard"
+      }
+    }
+  },
+  "headline": {
+    "tier_accuracy_acceptable": 0.8444,
+    "tier_accuracy_strict": 0.8,
+    "mandatory_ecdd_recall": 0.8095,
+    "under_application_rate": 0.0222,
+    "over_application_rate": 0.0222,
+    "retrieval_recall_at_k": null,
+    "citation_validity": 0.9325,
+    "citation_precision": 0.0208,
+    "citation_recall": 0.05,
+    "faithfulness": null,
+    "key_fact_recall": 0.3438,
+    "unanswerable_abstain_rate": 0.8889,
+    "false_abstain_rate": 0.1887,
+    "consistency_agreement": 0.1667,
+    "fairness_invariance": 1.0,
+    "fairness_tier_flip_rate": 0.0,
+    "walert_pct_unanswered_out_of_kb": 0.8571,
+    "walert_ndcg_at_5": null,
+    "walert_rouge1_f1": 0.2674,
+    "walert_bertscore_f1": null,
+    "latency_p50_s": 17.22,
+    "latency_p95_s": 49.82
+  },
+  "acceptance": [
+    {
+      "name": "tier_accuracy_acceptable",
+      "metric": "tier_accuracy_acceptable",
+      "value": 0.8444,
+      "limit": 0.8,
+      "direction": "min",
+      "passed": true
+    },
+    {
+      "name": "mandatory_ecdd_recall",
+      "metric": "mandatory_ecdd_recall",
+      "value": 0.8095,
+      "limit": 1.0,
+      "direction": "min",
+      "passed": false
+    },
+    {
+      "name": "under_application_rate_max",
+      "metric": "under_application_rate",
+      "value": 0.0222,
+      "limit": 0.05,
+      "direction": "max",
+      "passed": true
+    },
+    {
+      "name": "retrieval_recall_at_k",
+      "metric": "retrieval_recall_at_k",
+      "value": null,
+      "limit": 0.8,
+      "direction": "min",
+      "passed": null
+    },
+    {
+      "name": "citation_validity",
+      "metric": "citation_validity",
+      "value": 0.9325,
+      "limit": 1.0,
+      "direction": "min",
+      "passed": false
+    },
+    {
+      "name": "citation_precision",
+      "metric": "citation_precision",
+      "value": 0.0208,
+      "limit": 0.6,
+      "direction": "min",
+      "passed": false
+    },
+    {
+      "name": "faithfulness",
+      "metric": "faithfulness",
+      "value": null,
+      "limit": 0.8,
+      "direction": "min",
+      "passed": null
+    },
+    {
+      "name": "unanswerable_abstain_rate",
+      "metric": "unanswerable_abstain_rate",
+      "value": 0.8889,
+      "limit": 0.75,
+      "direction": "min",
+      "passed": true
+    },
+    {
+      "name": "false_abstain_rate_max",
+      "metric": "false_abstain_rate",
+      "value": 0.1887,
+      "limit": 0.15,
+      "direction": "max",
+      "passed": false
+    },
+    {
+      "name": "fairness_tier_flip_rate_max",
+      "metric": "fairness_tier_flip_rate",
+      "value": 0.0,
+      "limit": 0.0,
+      "direction": "max",
+      "passed": true
+    }
+  ],
+  "run": {
+    "preset": "closed_book",
+    "started": "20261001-183552",
+    "duration_s": 1788.4,
+    "gold_file": "/Users/shreyasshekhar/Projects/aml-cdd-assistant/data/gold/scenarios.jsonl",
+    "n_items": 74,
+    "generator": "ollama:qwen3.5:9b",
+    "embedder": "ollama:qwen3-embedding:8b",
+    "judge": "ollama:llama3.1:8b",
+    "judge_same_as_generator": false,
+    "snapshot": "2026-09-30",
+    "bertscore": {
+      "model": "roberta-large",
+      "rescale_with_baseline": false,
+      "status": "skipped (bert-score not installed)"
+    },
+    "prompt_version": "3",
+    "gold_digest": "463bda694415",
+    "index_digest": "6a09f4b4a9e9a849",
+    "gold_status": {
+      "draft": 74,
+      "reviewed": 0
+    },
+    "finished": "2026-10-01T09:05:41+00:00"
+  }
+}

@@ -1,0 +1,1 @@
+ollama speed settings: off

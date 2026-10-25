@@ -1,0 +1,8 @@
+{"id": "A01-payments-only-ruled-out", "result": {"error": "Ollama timed out after 240s on /api/embed. Try a smaller model (generation.fallback_model) or raise ollama.timeout_s."}}
+{"id": "A02-grey-list-not-call-for-action", "result": {"error": "Ollama timed out after 240s on /api/embed. Try a smaller model (generation.fallback_model) or raise ollama.timeout_s."}}
+{"id": "A03-call-for-action-measures-risk-based", "result": {"error": "Ollama timed out after 240s on /api/embed. Try a smaller model (generation.fallback_model) or raise ollama.timeout_s."}}
+{"id": "A04-payments-only-unknown", "result": {"error": "Ollama timed out after 240s on /api/embed. Try a smaller model (generation.fallback_model) or raise ollama.timeout_s."}}
+{"id": "A05-payments-only-no-other-trigger", "result": {"error": "Ollama timed out after 240s on /api/embed. Try a smaller model (generation.fallback_model) or raise ollama.timeout_s."}}
+{"id": "A06-customer-known-no-other-trigger-info", "result": {"error": "Ollama timed out after 240s on /api/embed. Try a smaller model (generation.fallback_model) or raise ollama.timeout_s."}}
+{"id": "A07-contradictory-beneficial-owner-location", "result": {"error": "Ollama timed out after 240s on /api/embed. Try a smaller model (generation.fallback_model) or raise ollama.timeout_s."}}
+{"id": "A08-smr-deadline-out-of-kb", "result": {"error": "Ollama timed out after 240s on /api/embed. Try a smaller model (generation.fallback_model) or raise ollama.timeout_s."}}

@@ -1,0 +1,27 @@
+{
+  "dir": "/Users/shreyasshekhar/Projects/aml-cdd-assistant/results/20261025-044156-baseline-qwen3.5-9b_qwen3-embedding-8b",
+  "headline": {
+    "tier_accuracy_acceptable": 0.9111,
+    "tier_accuracy_strict": 0.9111,
+    "mandatory_ecdd_recall": 0.9048,
+    "under_application_rate": 0.0444,
+    "over_application_rate": 0.0222,
+    "retrieval_recall_at_k": 0.6698,
+    "citation_validity": 1.0,
+    "citation_precision": 0.3831,
+    "citation_recall": 0.6058,
+    "faithfulness": 0.8462,
+    "key_fact_recall": 0.9375,
+    "unanswerable_abstain_rate": 0.7778,
+    "false_abstain_rate": 0.0189,
+    "consistency_agreement": 0.8333,
+    "fairness_invariance": 1.0,
+    "fairness_tier_flip_rate": 0.0,
+    "walert_pct_unanswered_out_of_kb": 0.7143,
+    "walert_ndcg_at_5": 0.4388,
+    "walert_rouge1_f1": 0.2363,
+    "walert_bertscore_f1": null,
+    "latency_p50_s": 83.65,
+    "latency_p95_s": 101.54
+  }
+}

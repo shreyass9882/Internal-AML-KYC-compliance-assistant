@@ -1,0 +1,279 @@
+{
+  "n_items": 8,
+  "n_counterfactual_variants": 0,
+  "k": 8,
+  "tier": {
+    "n": 6,
+    "accuracy_strict": 0.6667,
+    "accuracy_acceptable": 0.6667,
+    "under_application_rate": 0.0,
+    "over_application_rate": 0.3333,
+    "abstained_rate": 0.0,
+    "mandatory_ecdd_recall": 1.0,
+    "macro_f1": 0.625,
+    "confusion": {
+      "standard": {
+        "standard": 3,
+        "enhanced": 2
+      },
+      "enhanced": {
+        "enhanced": 1
+      }
+    },
+    "accuracy_by_customer_type": {
+      "company": {
+        "n": 6,
+        "accuracy": 0.6667
+      }
+    }
+  },
+  "abstention": {
+    "unanswerable_n": 2,
+    "unanswerable_abstain_rate": 0.5,
+    "answerable_n": 6,
+    "false_abstain_rate": 0.0
+  },
+  "retrieval": {
+    "n": 6,
+    "recall_at_8": 1.0,
+    "hit_at_8": 1.0,
+    "mrr": 0.6905,
+    "items_without_reachable_refs": []
+  },
+  "attribution": {
+    "citation_validity": 1.0,
+    "citation_precision_section": 0.5083,
+    "citation_precision_document": 0.5083,
+    "citation_recall_section": 1.0,
+    "answers_with_uncited_points": 0,
+    "answers_calling_ruled_out_fact_unknown": 0
+  },
+  "faithfulness": {
+    "points": 49,
+    "judge_supported_rate": 0.7143,
+    "lexical_supported_rate": 0.9796,
+    "source_claims_judge_rate": 0.6667,
+    "by_kind": {
+      "conclusion": {
+        "n": 8,
+        "judge_supported_rate": 0.5,
+        "lexical_supported_rate": 1.0
+      },
+      "required_measures": {
+        "n": 22,
+        "judge_supported_rate": 0.6364,
+        "lexical_supported_rate": 0.9545
+      },
+      "rule": {
+        "n": 9,
+        "judge_supported_rate": 0.8889,
+        "lexical_supported_rate": 1.0
+      },
+      "scenario_fact": {
+        "n": 10,
+        "judge_supported_rate": 0.9,
+        "lexical_supported_rate": 1.0
+      }
+    },
+    "judge": "ollama:llama3.1:8b"
+  },
+  "explain": {
+    "n": 0,
+    "key_fact_recall": null
+  },
+  "consistency": {
+    "groups": 0,
+    "agreement_rate": null,
+    "all_correct_rate": null,
+    "detail": {}
+  },
+  "calibration": {
+    "high": {
+      "n": 5,
+      "accuracy": 0.6
+    },
+    "medium": {
+      "n": 1,
+      "accuracy": 1.0
+    }
+  },
+  "latency_s": {
+    "mean": 97.82,
+    "p50": 102.15,
+    "p95": 117.48
+  },
+  "errors": [],
+  "needs_review_rate": 0.25,
+  "walert": {
+    "out_of_kb_n": 1,
+    "pct_unanswered_out_of_kb": 1.0,
+    "underspecified_n": 1,
+    "pct_unanswered_underspecified": 0.0,
+    "ndcg": {
+      "inferred": {
+        "@1": 0.6667,
+        "@3": 0.7472,
+        "@5": 0.7293,
+        "n": 6
+      },
+      "all": {
+        "@1": 0.6667,
+        "@3": 0.7472,
+        "@5": 0.7293,
+        "n": 6
+      }
+    },
+    "rouge1": {
+      "n": 6,
+      "precision": 0.1989,
+      "recall": 0.6382,
+      "f1": 0.3,
+      "stemmer": false
+    },
+    "bertscore": null
+  },
+  "fairness": {
+    "groups": 0,
+    "variants": 0,
+    "invariance_rate": null,
+    "tier_flip_rate": null,
+    "confidence_flip_rate": null,
+    "variant_accuracy": null,
+    "flips": [],
+    "detail": {}
+  },
+  "headline": {
+    "tier_accuracy_acceptable": 0.6667,
+    "tier_accuracy_strict": 0.6667,
+    "mandatory_ecdd_recall": 1.0,
+    "under_application_rate": 0.0,
+    "over_application_rate": 0.3333,
+    "retrieval_recall_at_k": 1.0,
+    "citation_validity": 1.0,
+    "citation_precision": 0.5083,
+    "citation_recall": 1.0,
+    "faithfulness": 0.7143,
+    "key_fact_recall": null,
+    "unanswerable_abstain_rate": 0.5,
+    "false_abstain_rate": 0.0,
+    "consistency_agreement": null,
+    "fairness_invariance": null,
+    "fairness_tier_flip_rate": null,
+    "walert_pct_unanswered_out_of_kb": 1.0,
+    "walert_ndcg_at_5": 0.7293,
+    "walert_rouge1_f1": 0.3,
+    "walert_bertscore_f1": null,
+    "latency_p50_s": 102.15,
+    "latency_p95_s": 117.48
+  },
+  "acceptance": [
+    {
+      "name": "tier_accuracy_acceptable",
+      "metric": "tier_accuracy_acceptable",
+      "value": 0.6667,
+      "limit": 0.8,
+      "direction": "min",
+      "passed": false
+    },
+    {
+      "name": "mandatory_ecdd_recall",
+      "metric": "mandatory_ecdd_recall",
+      "value": 1.0,
+      "limit": 1.0,
+      "direction": "min",
+      "passed": true
+    },
+    {
+      "name": "under_application_rate_max",
+      "metric": "under_application_rate",
+      "value": 0.0,
+      "limit": 0.05,
+      "direction": "max",
+      "passed": true
+    },
+    {
+      "name": "retrieval_recall_at_k",
+      "metric": "retrieval_recall_at_k",
+      "value": 1.0,
+      "limit": 0.8,
+      "direction": "min",
+      "passed": true
+    },
+    {
+      "name": "citation_validity",
+      "metric": "citation_validity",
+      "value": 1.0,
+      "limit": 1.0,
+      "direction": "min",
+      "passed": true
+    },
+    {
+      "name": "citation_precision",
+      "metric": "citation_precision",
+      "value": 0.5083,
+      "limit": 0.6,
+      "direction": "min",
+      "passed": false
+    },
+    {
+      "name": "faithfulness",
+      "metric": "faithfulness",
+      "value": 0.7143,
+      "limit": 0.8,
+      "direction": "min",
+      "passed": false
+    },
+    {
+      "name": "unanswerable_abstain_rate",
+      "metric": "unanswerable_abstain_rate",
+      "value": 0.5,
+      "limit": 0.75,
+      "direction": "min",
+      "passed": false
+    },
+    {
+      "name": "false_abstain_rate_max",
+      "metric": "false_abstain_rate",
+      "value": 0.0,
+      "limit": 0.15,
+      "direction": "max",
+      "passed": true
+    },
+    {
+      "name": "fairness_tier_flip_rate_max",
+      "metric": "fairness_tier_flip_rate",
+      "value": null,
+      "limit": 0.0,
+      "direction": "max",
+      "passed": null
+    }
+  ],
+  "run": {
+    "preset": "full",
+    "started": "20261025-041542",
+    "duration_s": 1086.1,
+    "answer_phase_s": 782.6,
+    "grading_phase_s": 303.6,
+    "grading": "after all answers",
+    "gold_file": "data/gold/adversarial.jsonl",
+    "n_items": 8,
+    "generator": "ollama:qwen3.5:9b",
+    "embedder": "ollama:qwen3-embedding:8b",
+    "judge": "ollama:llama3.1:8b",
+    "judge_same_as_generator": false,
+    "snapshot": "2026-09-30",
+    "bertscore": {
+      "model": "roberta-large",
+      "rescale_with_baseline": false,
+      "status": "skipped (bert-score not installed)"
+    },
+    "prompt_version": "3.3",
+    "gold_digest": "73ac7badb968",
+    "index_digest": "6a09f4b4a9e9a849",
+    "gold_status": {
+      "draft": 8,
+      "reviewed": 0
+    },
+    "finished": "2026-10-24T17:33:48+00:00"
+  }
+}

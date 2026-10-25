@@ -1,0 +1,8 @@
+{"id": "R01-initial-cdd-matters", "result": {"error": "Ollama timed out after 240s on /api/embed. Try a smaller model (generation.fallback_model) or raise ollama.timeout_s."}}
+{"id": "R02-body-corporate-beneficial-owners", "result": {"error": "Ollama timed out after 240s on /api/embed. Try a smaller model (generation.fallback_model) or raise ollama.timeout_s."}}
+{"id": "R03-person-acting-on-behalf", "result": {"error": "Ollama timed out after 240s on /api/embed. Try a smaller model (generation.fallback_model) or raise ollama.timeout_s."}}
+{"id": "R04-ecdd-mandatory-circumstances", "result": {"error": "Ollama timed out after 240s on /api/embed. Try a smaller model (generation.fallback_model) or raise ollama.timeout_s."}}
+{"id": "R05-ecdd-measures-high-risk", "result": {"error": "Ollama timed out after 240s on /api/embed. Try a smaller model (generation.fallback_model) or raise ollama.timeout_s."}}
+{"id": "R06-call-for-action-vs-increased-monitoring", "result": {"error": "Ollama timed out after 240s on /api/embed. Try a smaller model (generation.fallback_model) or raise ollama.timeout_s."}}
+{"id": "R07-delayed-initial-cdd", "result": {"error": "Ollama timed out after 240s on /api/embed. Try a smaller model (generation.fallback_model) or raise ollama.timeout_s."}}
+{"id": "R08-pep-matters", "result": {"error": "Ollama timed out after 240s on /api/embed. Try a smaller model (generation.fallback_model) or raise ollama.timeout_s."}}

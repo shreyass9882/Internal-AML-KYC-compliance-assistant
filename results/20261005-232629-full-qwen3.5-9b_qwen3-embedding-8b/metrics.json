@@ -1,0 +1,466 @@
+{
+  "n_items": 62,
+  "n_counterfactual_variants": 12,
+  "k": 8,
+  "tier": {
+    "n": 45,
+    "accuracy_strict": 0.0222,
+    "accuracy_acceptable": 0.0222,
+    "under_application_rate": 0.0,
+    "over_application_rate": 0.0,
+    "abstained_rate": 0.9778,
+    "mandatory_ecdd_recall": 0.0476,
+    "macro_f1": 0.0303,
+    "confusion": {
+      "enhanced": {
+        "enhanced": 1,
+        "insufficient_information": 20
+      },
+      "standard": {
+        "insufficient_information": 16
+      },
+      "simplified": {
+        "insufficient_information": 8
+      }
+    },
+    "accuracy_by_customer_type": {
+      "company": {
+        "n": 9,
+        "accuracy": 0.0
+      },
+      "government_body": {
+        "n": 5,
+        "accuracy": 0.0
+      },
+      "individual": {
+        "n": 10,
+        "accuracy": 0.1
+      },
+      "other": {
+        "n": 1,
+        "accuracy": 0.0
+      },
+      "partnership": {
+        "n": 3,
+        "accuracy": 0.0
+      },
+      "sole_trader": {
+        "n": 6,
+        "accuracy": 0.0
+      },
+      "trust": {
+        "n": 7,
+        "accuracy": 0.0
+      },
+      "unincorporated_association": {
+        "n": 4,
+        "accuracy": 0.0
+      }
+    }
+  },
+  "abstention": {
+    "unanswerable_n": 9,
+    "unanswerable_abstain_rate": 1.0,
+    "answerable_n": 53,
+    "false_abstain_rate": 0.9811
+  },
+  "retrieval": {
+    "n": 53,
+    "recall_at_8": 0.0189,
+    "hit_at_8": 0.0189,
+    "mrr": 0.0189,
+    "items_without_reachable_refs": []
+  },
+  "attribution": {
+    "citation_validity": 1.0,
+    "citation_precision_section": 0.4286,
+    "citation_precision_document": 0.8571,
+    "citation_recall_section": 1.0,
+    "answers_with_uncited_points": 0,
+    "answers_calling_ruled_out_fact_unknown": 0
+  },
+  "faithfulness": {
+    "points": 7,
+    "judge_supported_rate": null,
+    "lexical_supported_rate": 1.0,
+    "source_claims_judge_rate": null,
+    "by_kind": {
+      "conclusion": {
+        "n": 1,
+        "judge_supported_rate": null,
+        "lexical_supported_rate": 1.0
+      },
+      "required_measures": {
+        "n": 4,
+        "judge_supported_rate": null,
+        "lexical_supported_rate": 1.0
+      },
+      "rule": {
+        "n": 1,
+        "judge_supported_rate": null,
+        "lexical_supported_rate": 1.0
+      },
+      "scenario_fact": {
+        "n": 1,
+        "judge_supported_rate": null,
+        "lexical_supported_rate": 1.0
+      }
+    },
+    "judge": "ollama:llama3.1:8b"
+  },
+  "explain": {
+    "n": 8,
+    "key_fact_recall": 0.0
+  },
+  "consistency": {
+    "groups": 6,
+    "agreement_rate": 0.8333,
+    "all_correct_rate": 0.0,
+    "detail": {
+      "G-domestic-pep-medium": {
+        "D11-domestic-pep-medium-risk": null,
+        "D51-assoc-domestic-pep-treasurer": null
+      },
+      "G-foreign-pep": {
+        "D01-foreign-pep-individual": "enhanced",
+        "D02-foreign-pep-beneficial-owner": null,
+        "D03-foreign-pep-trust-appointor": null,
+        "D14-foreign-pep-family-member": null,
+        "D41-unit-trust-foreign-pep": null,
+        "D54-partnership-foreign-pep": null
+      },
+      "G-high-risk-jurisdiction": {
+        "D04-high-risk-jurisdiction-company": null,
+        "D35-government-body-high-risk-jurisdiction": null,
+        "D42-trust-formed-high-risk": null,
+        "D44-sole-trader-high-risk-country": null
+      },
+      "G-simplified-government": {
+        "D28-commonwealth-department": null,
+        "D47-local-council": null,
+        "D48-state-owned-corporation": null
+      },
+      "G-smr": {
+        "D06-smr-continuing-sole-trader": null,
+        "D36-low-risk-individual-smr": null
+      },
+      "G-standard-individual": {
+        "D16-standard-individual": null,
+        "D17-standard-individual-paraphrase": null
+      }
+    }
+  },
+  "calibration": {
+    "high": {
+      "n": 1,
+      "accuracy": 1.0
+    },
+    "none": {
+      "n": 44,
+      "accuracy": 0.0
+    }
+  },
+  "latency_s": {
+    "mean": 80.17,
+    "p50": 80.17,
+    "p95": 80.17
+  },
+  "errors": [
+    "D02-foreign-pep-beneficial-owner",
+    "D03-foreign-pep-trust-appointor",
+    "D04-high-risk-jurisdiction-company",
+    "D06-smr-continuing-sole-trader",
+    "D07-nested-services",
+    "D08-unusual-complex-structure",
+    "D10-domestic-pep-high-risk",
+    "D13-high-risk-rating-sole-trader",
+    "D14-foreign-pep-family-member",
+    "D34-listed-company-unusual",
+    "D35-government-body-high-risk-jurisdiction",
+    "D36-low-risk-individual-smr",
+    "D09-virtual-assets-cash",
+    "D11-domestic-pep-medium-risk",
+    "D15-foreign-branch-same-country-pep",
+    "D16-standard-individual",
+    "D17-standard-individual-paraphrase",
+    "D18-sole-trader",
+    "D19-private-company",
+    "D20-family-trust",
+    "D22-unincorporated-association",
+    "D23-smsf-trap",
+    "D24-asic-registration-trap",
+    "D28-commonwealth-department",
+    "D29-apra-regulated-insurer",
+    "D30-asx-listed-company",
+    "D31-strata-owners-corporation",
+    "D33-low-risk-pensioner",
+    "D40-charitable-trust",
+    "D41-unit-trust-foreign-pep",
+    "D42-trust-formed-high-risk",
+    "D43-testamentary-trust",
+    "D44-sole-trader-high-risk-country",
+    "D45-sole-trader-low-risk",
+    "D46-sole-trader-no-standard-id",
+    "D47-local-council",
+    "D48-state-owned-corporation",
+    "D49-embassy-ambassador-signatory",
+    "D50-church-group",
+    "D51-assoc-domestic-pep-treasurer",
+    "D52-assoc-unusual-cash",
+    "D53-law-partnership",
+    "D54-partnership-foreign-pep",
+    "D55-farming-partnership",
+    "D37-no-details",
+    "D38-opaque-reference",
+    "D16-cf-aisha-rahman",
+    "D16-cf-nguyen-thi-lan",
+    "D16-cf-priya-sharma",
+    "D17-cf-born-india",
+    "D17-cf-born-china",
+    "D17-cf-born-greece",
+    "D01-cf-new-zealand",
+    "D01-cf-united-kingdom",
+    "D01-cf-india",
+    "D18-cf-mohammed-hassan",
+    "D18-cf-tran-van-minh",
+    "D18-cf-kwame-mensah",
+    "E02-sow-vs-sof",
+    "E03-trust-kyc",
+    "E04-pre-reform-customers",
+    "E05-unidentifiable-beneficial-owner",
+    "E06-nested-review-frequency",
+    "E08-simplified-beneficial-owners",
+    "E10-ecdd-triggers",
+    "E12-delayed-verification",
+    "U01-ttr-threshold",
+    "U03-sanctions-lookup",
+    "U04-civil-penalty",
+    "U05-repealed-rules",
+    "U06-ifti-deadline",
+    "U07-enrolment",
+    "U10-tipping-off"
+  ],
+  "needs_review_rate": 0.0,
+  "walert": {
+    "out_of_kb_n": 7,
+    "pct_unanswered_out_of_kb": 1.0,
+    "underspecified_n": 2,
+    "pct_unanswered_underspecified": 1.0,
+    "ndcg": {
+      "known": {
+        "@1": 0.0312,
+        "@3": 0.0302,
+        "@5": 0.0248,
+        "n": 32
+      },
+      "inferred": {
+        "@1": 0.0,
+        "@3": 0.0,
+        "@5": 0.0,
+        "n": 21
+      },
+      "all": {
+        "@1": 0.0189,
+        "@3": 0.0182,
+        "@5": 0.015,
+        "n": 53
+      }
+    },
+    "rouge1": {
+      "n": 53,
+      "precision": 0.0052,
+      "recall": 0.0142,
+      "f1": 0.0076,
+      "stemmer": false
+    },
+    "bertscore": null
+  },
+  "fairness": {
+    "groups": 4,
+    "variants": 12,
+    "invariance_rate": 0.75,
+    "tier_flip_rate": 0.25,
+    "confidence_flip_rate": 0.25,
+    "variant_accuracy": 0.0,
+    "flips": [
+      {
+        "id": "D01-cf-new-zealand",
+        "base": "D01-foreign-pep-individual",
+        "base_tier": "enhanced",
+        "tier": null
+      },
+      {
+        "id": "D01-cf-united-kingdom",
+        "base": "D01-foreign-pep-individual",
+        "base_tier": "enhanced",
+        "tier": null
+      },
+      {
+        "id": "D01-cf-india",
+        "base": "D01-foreign-pep-individual",
+        "base_tier": "enhanced",
+        "tier": null
+      }
+    ],
+    "detail": {
+      "D01-foreign-pep-individual": {
+        "D01-foreign-pep-individual": "enhanced",
+        "D01-cf-new-zealand": null,
+        "D01-cf-united-kingdom": null,
+        "D01-cf-india": null
+      },
+      "D16-standard-individual": {
+        "D16-standard-individual": null,
+        "D16-cf-aisha-rahman": null,
+        "D16-cf-nguyen-thi-lan": null,
+        "D16-cf-priya-sharma": null
+      },
+      "D17-standard-individual-paraphrase": {
+        "D17-standard-individual-paraphrase": null,
+        "D17-cf-born-india": null,
+        "D17-cf-born-china": null,
+        "D17-cf-born-greece": null
+      },
+      "D18-sole-trader": {
+        "D18-sole-trader": null,
+        "D18-cf-mohammed-hassan": null,
+        "D18-cf-tran-van-minh": null,
+        "D18-cf-kwame-mensah": null
+      }
+    }
+  },
+  "headline": {
+    "tier_accuracy_acceptable": 0.0222,
+    "tier_accuracy_strict": 0.0222,
+    "mandatory_ecdd_recall": 0.0476,
+    "under_application_rate": 0.0,
+    "over_application_rate": 0.0,
+    "retrieval_recall_at_k": 0.0189,
+    "citation_validity": 1.0,
+    "citation_precision": 0.4286,
+    "citation_recall": 1.0,
+    "faithfulness": 1.0,
+    "key_fact_recall": 0.0,
+    "unanswerable_abstain_rate": 1.0,
+    "false_abstain_rate": 0.9811,
+    "consistency_agreement": 0.8333,
+    "fairness_invariance": 0.75,
+    "fairness_tier_flip_rate": 0.25,
+    "walert_pct_unanswered_out_of_kb": 1.0,
+    "walert_ndcg_at_5": 0.015,
+    "walert_rouge1_f1": 0.0076,
+    "walert_bertscore_f1": null,
+    "latency_p50_s": 80.17,
+    "latency_p95_s": 80.17
+  },
+  "acceptance": [
+    {
+      "name": "tier_accuracy_acceptable",
+      "metric": "tier_accuracy_acceptable",
+      "value": 0.0222,
+      "limit": 0.8,
+      "direction": "min",
+      "passed": false
+    },
+    {
+      "name": "mandatory_ecdd_recall",
+      "metric": "mandatory_ecdd_recall",
+      "value": 0.0476,
+      "limit": 1.0,
+      "direction": "min",
+      "passed": false
+    },
+    {
+      "name": "under_application_rate_max",
+      "metric": "under_application_rate",
+      "value": 0.0,
+      "limit": 0.05,
+      "direction": "max",
+      "passed": true
+    },
+    {
+      "name": "retrieval_recall_at_k",
+      "metric": "retrieval_recall_at_k",
+      "value": 0.0189,
+      "limit": 0.8,
+      "direction": "min",
+      "passed": false
+    },
+    {
+      "name": "citation_validity",
+      "metric": "citation_validity",
+      "value": 1.0,
+      "limit": 1.0,
+      "direction": "min",
+      "passed": true
+    },
+    {
+      "name": "citation_precision",
+      "metric": "citation_precision",
+      "value": 0.4286,
+      "limit": 0.6,
+      "direction": "min",
+      "passed": false
+    },
+    {
+      "name": "faithfulness",
+      "metric": "faithfulness",
+      "value": 1.0,
+      "limit": 0.8,
+      "direction": "min",
+      "passed": true
+    },
+    {
+      "name": "unanswerable_abstain_rate",
+      "metric": "unanswerable_abstain_rate",
+      "value": 1.0,
+      "limit": 0.75,
+      "direction": "min",
+      "passed": true
+    },
+    {
+      "name": "false_abstain_rate_max",
+      "metric": "false_abstain_rate",
+      "value": 0.9811,
+      "limit": 0.15,
+      "direction": "max",
+      "passed": false
+    },
+    {
+      "name": "fairness_tier_flip_rate_max",
+      "metric": "fairness_tier_flip_rate",
+      "value": 0.25,
+      "limit": 0.0,
+      "direction": "max",
+      "passed": false
+    }
+  ],
+  "run": {
+    "preset": "full",
+    "started": "20261005-232629",
+    "duration_s": 8991.2,
+    "answer_phase_s": 8991.2,
+    "grading_phase_s": 0.0,
+    "grading": "after all answers",
+    "gold_file": "/Users/shreyasshekhar/Projects/aml-cdd-assistant/data/gold/scenarios.jsonl",
+    "n_items": 74,
+    "generator": "ollama:qwen3.5:9b",
+    "embedder": "ollama:qwen3-embedding:8b",
+    "judge": "ollama:llama3.1:8b",
+    "judge_same_as_generator": false,
+    "snapshot": "2026-09-30",
+    "bertscore": {
+      "model": "roberta-large",
+      "rescale_with_baseline": false,
+      "status": "skipped (bert-score not installed)"
+    },
+    "prompt_version": "3.3",
+    "gold_digest": "463bda694415",
+    "index_digest": "6a09f4b4a9e9a849",
+    "gold_status": {
+      "draft": 74,
+      "reviewed": 0
+    },
+    "finished": "2026-10-05T23:10:09+00:00"
+  }
+}

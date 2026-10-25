@@ -1,0 +1,99 @@
+paths:
+  sources_manifest: kb/sources.yaml
+  raw_dir: kb/raw
+  manual_dir: kb/manual
+  lock_file: kb/snapshot.lock.json
+  sections_file: kb/processed/sections.jsonl
+  chunks_file: kb/processed/chunks.jsonl
+  chroma_dir: .index/chroma
+  query_log: logs/queries.db
+  results_dir: results
+  gold_file: data/gold/scenarios.jsonl
+ollama:
+  host: http://localhost:11434
+  timeout_s: 240
+  keep_alive: 15m
+embedding:
+  backend: ollama
+  model: qwen3-embedding:8b
+  prompt_formats:
+    qwen3-embedding:
+      document: ''
+      query: 'Instruct: Given a question or customer scenario from an Australian AML/CTF
+        compliance officer, retrieve passages of AUSTRAC guidance or the AML/CTF Rules
+        that answer it
+
+        Query:'
+    nomic-embed-text:
+      document: 'search_document: '
+      query: 'search_query: '
+    embeddinggemma:
+      document: 'title: none | text: '
+      query: 'task: search result | query: '
+    mxbai-embed-large:
+      document: ''
+      query: 'Represent this sentence for searching relevant passages: '
+  batch_size: 16
+generation:
+  backend: ollama
+  model: qwen3.5:9b
+  fallback_model: qwen3.5:4b
+  think: false
+  temperature: 0.0
+  seed: 42
+  num_ctx: 8192
+  num_predict: 1024
+chunking:
+  max_words: 320
+  overlap_words: 40
+  min_words: 20
+retrieval:
+  enabled: true
+  collection: austrac_cdd
+  dense_k: 20
+  bm25_k: 20
+  final_k: 8
+  rrf_k: 60
+  max_chunks_per_section: 2
+  use_hybrid: false
+  use_fact_extraction: false
+  min_dense_similarity: 0.3
+verification:
+  min_support_overlap: 0.3
+  max_unsupported_share: 0.34
+  guardrails: false
+  guardrail_mode: escalate
+server:
+  username: cdd
+  password: null
+  manager_password: null
+query_log:
+  enabled: true
+  store_text: redacted
+  retention_days: 30
+eval:
+  judge_backend: ollama
+  judge_model: llama3.1:8b
+  judge_think: false
+  ndcg_cutoffs:
+  - 1
+  - 3
+  - 5
+  rouge_stemmer: false
+  bertscore:
+    enabled: auto
+    model_type: roberta-large
+    lang: en
+    rescale_with_baseline: false
+    batch_size: 16
+  thresholds:
+    tier_accuracy_acceptable: 0.8
+    mandatory_ecdd_recall: 1.0
+    under_application_rate_max: 0.05
+    retrieval_recall_at_k: 0.8
+    citation_validity: 1.0
+    citation_precision: 0.6
+    faithfulness: 0.8
+    unanswerable_abstain_rate: 0.75
+    false_abstain_rate_max: 0.15
+    fairness_tier_flip_rate_max: 0.0

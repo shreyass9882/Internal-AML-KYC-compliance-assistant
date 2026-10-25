@@ -1,0 +1,251 @@
+{
+  "n_items": 8,
+  "n_counterfactual_variants": 0,
+  "k": 8,
+  "tier": {
+    "n": 0,
+    "accuracy_strict": null,
+    "accuracy_acceptable": null,
+    "under_application_rate": null,
+    "over_application_rate": null,
+    "abstained_rate": null,
+    "mandatory_ecdd_recall": null,
+    "macro_f1": null,
+    "confusion": {},
+    "accuracy_by_customer_type": {}
+  },
+  "abstention": {
+    "unanswerable_n": 0,
+    "unanswerable_abstain_rate": null,
+    "answerable_n": 8,
+    "false_abstain_rate": 1.0
+  },
+  "retrieval": {
+    "n": 8,
+    "recall_at_8": 0.0,
+    "hit_at_8": 0.0,
+    "mrr": 0.0,
+    "items_without_reachable_refs": []
+  },
+  "attribution": {
+    "citation_validity": null,
+    "citation_precision_section": null,
+    "citation_precision_document": null,
+    "citation_recall_section": null,
+    "answers_with_uncited_points": 0,
+    "answers_calling_ruled_out_fact_unknown": 0
+  },
+  "faithfulness": {
+    "points": 0,
+    "judge_supported_rate": null,
+    "lexical_supported_rate": null,
+    "source_claims_judge_rate": null,
+    "by_kind": {},
+    "judge": null
+  },
+  "explain": {
+    "n": 8,
+    "key_fact_recall": 0.0
+  },
+  "consistency": {
+    "groups": 0,
+    "agreement_rate": null,
+    "all_correct_rate": null,
+    "detail": {}
+  },
+  "calibration": {},
+  "latency_s": {
+    "mean": null,
+    "p50": null,
+    "p95": null
+  },
+  "errors": [
+    "R01-initial-cdd-matters",
+    "R02-body-corporate-beneficial-owners",
+    "R03-person-acting-on-behalf",
+    "R04-ecdd-mandatory-circumstances",
+    "R05-ecdd-measures-high-risk",
+    "R06-call-for-action-vs-increased-monitoring",
+    "R07-delayed-initial-cdd",
+    "R08-pep-matters"
+  ],
+  "needs_review_rate": 0.0,
+  "walert": {
+    "out_of_kb_n": 0,
+    "pct_unanswered_out_of_kb": null,
+    "underspecified_n": 0,
+    "pct_unanswered_underspecified": null,
+    "ndcg": {
+      "known": {
+        "@1": 0.0,
+        "@3": 0.0,
+        "@5": 0.0,
+        "n": 7
+      },
+      "inferred": {
+        "@1": 0.0,
+        "@3": 0.0,
+        "@5": 0.0,
+        "n": 1
+      },
+      "all": {
+        "@1": 0.0,
+        "@3": 0.0,
+        "@5": 0.0,
+        "n": 8
+      }
+    },
+    "rouge1": {
+      "n": 8,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "stemmer": false
+    },
+    "bertscore": null
+  },
+  "fairness": {
+    "groups": 0,
+    "variants": 0,
+    "invariance_rate": null,
+    "tier_flip_rate": null,
+    "confidence_flip_rate": null,
+    "variant_accuracy": null,
+    "flips": [],
+    "detail": {}
+  },
+  "headline": {
+    "tier_accuracy_acceptable": null,
+    "tier_accuracy_strict": null,
+    "mandatory_ecdd_recall": null,
+    "under_application_rate": null,
+    "over_application_rate": null,
+    "retrieval_recall_at_k": 0.0,
+    "citation_validity": null,
+    "citation_precision": null,
+    "citation_recall": null,
+    "faithfulness": null,
+    "key_fact_recall": 0.0,
+    "unanswerable_abstain_rate": null,
+    "false_abstain_rate": 1.0,
+    "consistency_agreement": null,
+    "fairness_invariance": null,
+    "fairness_tier_flip_rate": null,
+    "walert_pct_unanswered_out_of_kb": null,
+    "walert_ndcg_at_5": 0.0,
+    "walert_rouge1_f1": 0.0,
+    "walert_bertscore_f1": null,
+    "latency_p50_s": null,
+    "latency_p95_s": null
+  },
+  "acceptance": [
+    {
+      "name": "tier_accuracy_acceptable",
+      "metric": "tier_accuracy_acceptable",
+      "value": null,
+      "limit": 0.8,
+      "direction": "min",
+      "passed": null
+    },
+    {
+      "name": "mandatory_ecdd_recall",
+      "metric": "mandatory_ecdd_recall",
+      "value": null,
+      "limit": 1.0,
+      "direction": "min",
+      "passed": null
+    },
+    {
+      "name": "under_application_rate_max",
+      "metric": "under_application_rate",
+      "value": null,
+      "limit": 0.05,
+      "direction": "max",
+      "passed": null
+    },
+    {
+      "name": "retrieval_recall_at_k",
+      "metric": "retrieval_recall_at_k",
+      "value": 0.0,
+      "limit": 0.8,
+      "direction": "min",
+      "passed": false
+    },
+    {
+      "name": "citation_validity",
+      "metric": "citation_validity",
+      "value": null,
+      "limit": 1.0,
+      "direction": "min",
+      "passed": null
+    },
+    {
+      "name": "citation_precision",
+      "metric": "citation_precision",
+      "value": null,
+      "limit": 0.6,
+      "direction": "min",
+      "passed": null
+    },
+    {
+      "name": "faithfulness",
+      "metric": "faithfulness",
+      "value": null,
+      "limit": 0.8,
+      "direction": "min",
+      "passed": null
+    },
+    {
+      "name": "unanswerable_abstain_rate",
+      "metric": "unanswerable_abstain_rate",
+      "value": null,
+      "limit": 0.75,
+      "direction": "min",
+      "passed": null
+    },
+    {
+      "name": "false_abstain_rate_max",
+      "metric": "false_abstain_rate",
+      "value": 1.0,
+      "limit": 0.15,
+      "direction": "max",
+      "passed": false
+    },
+    {
+      "name": "fairness_tier_flip_rate_max",
+      "metric": "fairness_tier_flip_rate",
+      "value": null,
+      "limit": 0.0,
+      "direction": "max",
+      "passed": null
+    }
+  ],
+  "run": {
+    "preset": "full",
+    "started": "20261005-232714",
+    "duration_s": 1920.1,
+    "answer_phase_s": 1920.1,
+    "grading_phase_s": 0.0,
+    "grading": "after all answers",
+    "gold_file": "data/gold/retrieval-stress.jsonl",
+    "n_items": 8,
+    "generator": "ollama:qwen3.5:9b",
+    "embedder": "ollama:qwen3-embedding:8b",
+    "judge": "ollama:llama3.1:8b",
+    "judge_same_as_generator": false,
+    "snapshot": "2026-09-30",
+    "bertscore": {
+      "model": "roberta-large",
+      "rescale_with_baseline": false,
+      "status": "skipped (bert-score not installed)"
+    },
+    "prompt_version": null,
+    "gold_digest": "78fe9f422517",
+    "index_digest": "6a09f4b4a9e9a849",
+    "gold_status": {
+      "draft": 8,
+      "reviewed": 0
+    },
+    "finished": "2026-10-05T12:59:14+00:00"
+  }
+}

@@ -1,0 +1,262 @@
+{
+  "n_items": 8,
+  "n_counterfactual_variants": 0,
+  "k": 8,
+  "tier": {
+    "n": 6,
+    "accuracy_strict": 0.0,
+    "accuracy_acceptable": 0.6667,
+    "under_application_rate": 0.0,
+    "over_application_rate": 0.0,
+    "abstained_rate": 1.0,
+    "mandatory_ecdd_recall": 0.0,
+    "macro_f1": 0.0,
+    "confusion": {
+      "standard": {
+        "insufficient_information": 5
+      },
+      "enhanced": {
+        "insufficient_information": 1
+      }
+    },
+    "accuracy_by_customer_type": {
+      "company": {
+        "n": 6,
+        "accuracy": 0.6667
+      }
+    }
+  },
+  "abstention": {
+    "unanswerable_n": 2,
+    "unanswerable_abstain_rate": 1.0,
+    "answerable_n": 6,
+    "false_abstain_rate": 1.0
+  },
+  "retrieval": {
+    "n": 6,
+    "recall_at_8": 0.0,
+    "hit_at_8": 0.0,
+    "mrr": 0.0,
+    "items_without_reachable_refs": []
+  },
+  "attribution": {
+    "citation_validity": null,
+    "citation_precision_section": null,
+    "citation_precision_document": null,
+    "citation_recall_section": null,
+    "answers_with_uncited_points": 0,
+    "answers_calling_ruled_out_fact_unknown": 0
+  },
+  "faithfulness": {
+    "points": 0,
+    "judge_supported_rate": null,
+    "lexical_supported_rate": null,
+    "source_claims_judge_rate": null,
+    "by_kind": {},
+    "judge": null
+  },
+  "explain": {
+    "n": 0,
+    "key_fact_recall": null
+  },
+  "consistency": {
+    "groups": 0,
+    "agreement_rate": null,
+    "all_correct_rate": null,
+    "detail": {}
+  },
+  "calibration": {
+    "none": {
+      "n": 6,
+      "accuracy": 0.6667
+    }
+  },
+  "latency_s": {
+    "mean": null,
+    "p50": null,
+    "p95": null
+  },
+  "errors": [
+    "A01-payments-only-ruled-out",
+    "A02-grey-list-not-call-for-action",
+    "A03-call-for-action-measures-risk-based",
+    "A04-payments-only-unknown",
+    "A05-payments-only-no-other-trigger",
+    "A06-customer-known-no-other-trigger-info",
+    "A07-contradictory-beneficial-owner-location",
+    "A08-smr-deadline-out-of-kb"
+  ],
+  "needs_review_rate": 0.0,
+  "walert": {
+    "out_of_kb_n": 1,
+    "pct_unanswered_out_of_kb": 1.0,
+    "underspecified_n": 1,
+    "pct_unanswered_underspecified": 1.0,
+    "ndcg": {
+      "inferred": {
+        "@1": 0.0,
+        "@3": 0.0,
+        "@5": 0.0,
+        "n": 6
+      },
+      "all": {
+        "@1": 0.0,
+        "@3": 0.0,
+        "@5": 0.0,
+        "n": 6
+      }
+    },
+    "rouge1": {
+      "n": 6,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "stemmer": false
+    },
+    "bertscore": null
+  },
+  "fairness": {
+    "groups": 0,
+    "variants": 0,
+    "invariance_rate": null,
+    "tier_flip_rate": null,
+    "confidence_flip_rate": null,
+    "variant_accuracy": null,
+    "flips": [],
+    "detail": {}
+  },
+  "headline": {
+    "tier_accuracy_acceptable": 0.6667,
+    "tier_accuracy_strict": 0.0,
+    "mandatory_ecdd_recall": 0.0,
+    "under_application_rate": 0.0,
+    "over_application_rate": 0.0,
+    "retrieval_recall_at_k": 0.0,
+    "citation_validity": null,
+    "citation_precision": null,
+    "citation_recall": null,
+    "faithfulness": null,
+    "key_fact_recall": null,
+    "unanswerable_abstain_rate": 1.0,
+    "false_abstain_rate": 1.0,
+    "consistency_agreement": null,
+    "fairness_invariance": null,
+    "fairness_tier_flip_rate": null,
+    "walert_pct_unanswered_out_of_kb": 1.0,
+    "walert_ndcg_at_5": 0.0,
+    "walert_rouge1_f1": 0.0,
+    "walert_bertscore_f1": null,
+    "latency_p50_s": null,
+    "latency_p95_s": null
+  },
+  "acceptance": [
+    {
+      "name": "tier_accuracy_acceptable",
+      "metric": "tier_accuracy_acceptable",
+      "value": 0.6667,
+      "limit": 0.8,
+      "direction": "min",
+      "passed": false
+    },
+    {
+      "name": "mandatory_ecdd_recall",
+      "metric": "mandatory_ecdd_recall",
+      "value": 0.0,
+      "limit": 1.0,
+      "direction": "min",
+      "passed": false
+    },
+    {
+      "name": "under_application_rate_max",
+      "metric": "under_application_rate",
+      "value": 0.0,
+      "limit": 0.05,
+      "direction": "max",
+      "passed": true
+    },
+    {
+      "name": "retrieval_recall_at_k",
+      "metric": "retrieval_recall_at_k",
+      "value": 0.0,
+      "limit": 0.8,
+      "direction": "min",
+      "passed": false
+    },
+    {
+      "name": "citation_validity",
+      "metric": "citation_validity",
+      "value": null,
+      "limit": 1.0,
+      "direction": "min",
+      "passed": null
+    },
+    {
+      "name": "citation_precision",
+      "metric": "citation_precision",
+      "value": null,
+      "limit": 0.6,
+      "direction": "min",
+      "passed": null
+    },
+    {
+      "name": "faithfulness",
+      "metric": "faithfulness",
+      "value": null,
+      "limit": 0.8,
+      "direction": "min",
+      "passed": null
+    },
+    {
+      "name": "unanswerable_abstain_rate",
+      "metric": "unanswerable_abstain_rate",
+      "value": 1.0,
+      "limit": 0.75,
+      "direction": "min",
+      "passed": true
+    },
+    {
+      "name": "false_abstain_rate_max",
+      "metric": "false_abstain_rate",
+      "value": 1.0,
+      "limit": 0.15,
+      "direction": "max",
+      "passed": false
+    },
+    {
+      "name": "fairness_tier_flip_rate_max",
+      "metric": "fairness_tier_flip_rate",
+      "value": null,
+      "limit": 0.0,
+      "direction": "max",
+      "passed": null
+    }
+  ],
+  "run": {
+    "preset": "full",
+    "started": "20261005-232733",
+    "duration_s": 2019.8,
+    "answer_phase_s": 2019.8,
+    "grading_phase_s": 0.0,
+    "grading": "after all answers",
+    "gold_file": "data/gold/adversarial.jsonl",
+    "n_items": 8,
+    "generator": "ollama:qwen3.5:9b",
+    "embedder": "ollama:qwen3-embedding:8b",
+    "judge": "ollama:llama3.1:8b",
+    "judge_same_as_generator": false,
+    "snapshot": "2026-09-30",
+    "bertscore": {
+      "model": "roberta-large",
+      "rescale_with_baseline": false,
+      "status": "skipped (bert-score not installed)"
+    },
+    "prompt_version": null,
+    "gold_digest": "73ac7badb968",
+    "index_digest": "6a09f4b4a9e9a849",
+    "gold_status": {
+      "draft": 8,
+      "reviewed": 0
+    },
+    "finished": "2026-10-05T13:01:13+00:00"
+  }
+}

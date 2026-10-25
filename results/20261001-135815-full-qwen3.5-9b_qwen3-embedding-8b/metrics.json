@@ -1,0 +1,305 @@
+{
+  "n_items": 12,
+  "n_counterfactual_variants": 0,
+  "k": 8,
+  "tier": {
+    "n": 10,
+    "accuracy_strict": 0.9,
+    "accuracy_acceptable": 0.9,
+    "under_application_rate": 0.0,
+    "over_application_rate": 0.1,
+    "abstained_rate": 0.0,
+    "mandatory_ecdd_recall": 1.0,
+    "macro_f1": 0.9153,
+    "confusion": {
+      "enhanced": {
+        "enhanced": 4
+      },
+      "standard": {
+        "standard": 3,
+        "enhanced": 1
+      },
+      "simplified": {
+        "simplified": 2
+      }
+    },
+    "accuracy_by_customer_type": {
+      "company": {
+        "n": 3,
+        "accuracy": 1.0
+      },
+      "government_body": {
+        "n": 1,
+        "accuracy": 1.0
+      },
+      "individual": {
+        "n": 5,
+        "accuracy": 1.0
+      },
+      "unincorporated_association": {
+        "n": 1,
+        "accuracy": 0.0
+      }
+    }
+  },
+  "abstention": {
+    "unanswerable_n": 2,
+    "unanswerable_abstain_rate": 1.0,
+    "answerable_n": 10,
+    "false_abstain_rate": 0.0
+  },
+  "retrieval": {
+    "n": 10,
+    "recall_at_8": 0.55,
+    "hit_at_8": 0.6,
+    "mrr": 0.3958,
+    "items_without_reachable_refs": []
+  },
+  "attribution": {
+    "citation_validity": 1.0,
+    "citation_precision_section": 0.2583,
+    "citation_precision_document": 0.3083,
+    "citation_recall_section": 0.45,
+    "answers_with_uncited_points": 0
+  },
+  "faithfulness": {
+    "points": 69,
+    "judge_supported_rate": 0.7536,
+    "lexical_supported_rate": 0.9565,
+    "source_claims_judge_rate": 0.7037,
+    "by_kind": {
+      "conclusion": {
+        "n": 10,
+        "judge_supported_rate": 0.7,
+        "lexical_supported_rate": 1.0
+      },
+      "required_measures": {
+        "n": 29,
+        "judge_supported_rate": 0.7241,
+        "lexical_supported_rate": 1.0
+      },
+      "rule": {
+        "n": 15,
+        "judge_supported_rate": 0.6667,
+        "lexical_supported_rate": 0.9333
+      },
+      "scenario_fact": {
+        "n": 15,
+        "judge_supported_rate": 0.9333,
+        "lexical_supported_rate": 0.8667
+      }
+    },
+    "judge": "ollama:llama3.1:8b"
+  },
+  "explain": {
+    "n": 0,
+    "key_fact_recall": null
+  },
+  "consistency": {
+    "groups": 2,
+    "agreement_rate": 0.5,
+    "all_correct_rate": 0.5,
+    "detail": {
+      "G-domestic-pep-medium": {
+        "D11-domestic-pep-medium-risk": "standard",
+        "D51-assoc-domestic-pep-treasurer": "enhanced"
+      },
+      "G-foreign-pep": {
+        "D01-foreign-pep-individual": "enhanced",
+        "D02-foreign-pep-beneficial-owner": "enhanced"
+      }
+    }
+  },
+  "calibration": {
+    "high": {
+      "n": 7,
+      "accuracy": 0.8571
+    },
+    "medium": {
+      "n": 3,
+      "accuracy": 1.0
+    }
+  },
+  "latency_s": {
+    "mean": 89.96,
+    "p50": 97.15,
+    "p95": 106.21
+  },
+  "errors": [],
+  "needs_review_rate": 0.1667,
+  "walert": {
+    "out_of_kb_n": 1,
+    "pct_unanswered_out_of_kb": 1.0,
+    "underspecified_n": 1,
+    "pct_unanswered_underspecified": 1.0,
+    "ndcg": {
+      "known": {
+        "@1": 0.5,
+        "@3": 0.4282,
+        "@5": 0.3708,
+        "n": 3
+      },
+      "inferred": {
+        "@1": 0.5,
+        "@3": 0.4311,
+        "@5": 0.4275,
+        "n": 7
+      },
+      "all": {
+        "@1": 0.5,
+        "@3": 0.4302,
+        "@5": 0.4105,
+        "n": 10
+      }
+    },
+    "rouge1": {
+      "n": 10,
+      "precision": 0.1893,
+      "recall": 0.7085,
+      "f1": 0.2904,
+      "stemmer": false
+    },
+    "bertscore": null
+  },
+  "fairness": {
+    "groups": 0,
+    "variants": 0,
+    "invariance_rate": null,
+    "tier_flip_rate": null,
+    "confidence_flip_rate": null,
+    "variant_accuracy": null,
+    "flips": [],
+    "detail": {}
+  },
+  "headline": {
+    "tier_accuracy_acceptable": 0.9,
+    "tier_accuracy_strict": 0.9,
+    "mandatory_ecdd_recall": 1.0,
+    "under_application_rate": 0.0,
+    "over_application_rate": 0.1,
+    "retrieval_recall_at_k": 0.55,
+    "citation_validity": 1.0,
+    "citation_precision": 0.2583,
+    "citation_recall": 0.45,
+    "faithfulness": 0.7536,
+    "key_fact_recall": null,
+    "unanswerable_abstain_rate": 1.0,
+    "false_abstain_rate": 0.0,
+    "consistency_agreement": 0.5,
+    "fairness_invariance": null,
+    "fairness_tier_flip_rate": null,
+    "walert_pct_unanswered_out_of_kb": 1.0,
+    "walert_ndcg_at_5": 0.4105,
+    "walert_rouge1_f1": 0.2904,
+    "walert_bertscore_f1": null,
+    "latency_p50_s": 97.15,
+    "latency_p95_s": 106.21
+  },
+  "acceptance": [
+    {
+      "name": "tier_accuracy_acceptable",
+      "metric": "tier_accuracy_acceptable",
+      "value": 0.9,
+      "limit": 0.8,
+      "direction": "min",
+      "passed": true
+    },
+    {
+      "name": "mandatory_ecdd_recall",
+      "metric": "mandatory_ecdd_recall",
+      "value": 1.0,
+      "limit": 1.0,
+      "direction": "min",
+      "passed": true
+    },
+    {
+      "name": "under_application_rate_max",
+      "metric": "under_application_rate",
+      "value": 0.0,
+      "limit": 0.05,
+      "direction": "max",
+      "passed": true
+    },
+    {
+      "name": "retrieval_recall_at_k",
+      "metric": "retrieval_recall_at_k",
+      "value": 0.55,
+      "limit": 0.8,
+      "direction": "min",
+      "passed": false
+    },
+    {
+      "name": "citation_validity",
+      "metric": "citation_validity",
+      "value": 1.0,
+      "limit": 1.0,
+      "direction": "min",
+      "passed": true
+    },
+    {
+      "name": "citation_precision",
+      "metric": "citation_precision",
+      "value": 0.2583,
+      "limit": 0.6,
+      "direction": "min",
+      "passed": false
+    },
+    {
+      "name": "faithfulness",
+      "metric": "faithfulness",
+      "value": 0.7536,
+      "limit": 0.8,
+      "direction": "min",
+      "passed": false
+    },
+    {
+      "name": "unanswerable_abstain_rate",
+      "metric": "unanswerable_abstain_rate",
+      "value": 1.0,
+      "limit": 0.75,
+      "direction": "min",
+      "passed": true
+    },
+    {
+      "name": "false_abstain_rate_max",
+      "metric": "false_abstain_rate",
+      "value": 0.0,
+      "limit": 0.15,
+      "direction": "max",
+      "passed": true
+    },
+    {
+      "name": "fairness_tier_flip_rate_max",
+      "metric": "fairness_tier_flip_rate",
+      "value": null,
+      "limit": 0.0,
+      "direction": "max",
+      "passed": null
+    }
+  ],
+  "run": {
+    "preset": "full",
+    "started": "20261001-135815",
+    "duration_s": 1514.4,
+    "gold_file": "/Users/shreyasshekhar/Projects/aml-cdd-assistant/data/gold/scenarios.jsonl",
+    "n_items": 12,
+    "generator": "ollama:qwen3.5:9b",
+    "embedder": "ollama:qwen3-embedding:8b",
+    "judge": "ollama:llama3.1:8b",
+    "judge_same_as_generator": false,
+    "snapshot": "2026-09-30",
+    "bertscore": {
+      "model": "roberta-large",
+      "rescale_with_baseline": false,
+      "status": "skipped (bert-score not installed)"
+    },
+    "prompt_version": "3",
+    "gold_digest": "463bda694415",
+    "index_digest": "6a09f4b4a9e9a849",
+    "gold_status": {
+      "draft": 12,
+      "reviewed": 0
+    },
+    "finished": "2026-10-01T04:23:44+00:00"
+  }
+}

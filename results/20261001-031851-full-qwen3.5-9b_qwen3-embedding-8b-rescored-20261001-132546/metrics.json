@@ -1,0 +1,371 @@
+{
+  "n_items": 62,
+  "n_counterfactual_variants": 12,
+  "k": 8,
+  "tier": {
+    "n": 45,
+    "accuracy_strict": 0.8889,
+    "accuracy_acceptable": 0.8889,
+    "under_application_rate": 0.0667,
+    "over_application_rate": 0.0444,
+    "abstained_rate": 0.0,
+    "mandatory_ecdd_recall": 0.9524,
+    "macro_f1": 0.8822,
+    "confusion": {
+      "enhanced": {
+        "enhanced": 20,
+        "standard": 1
+      },
+      "standard": {
+        "enhanced": 2,
+        "standard": 12,
+        "simplified": 2
+      },
+      "simplified": {
+        "simplified": 8
+      }
+    },
+    "accuracy_by_customer_type": {
+      "company": {
+        "n": 9,
+        "accuracy": 0.8889
+      },
+      "government_body": {
+        "n": 5,
+        "accuracy": 0.8
+      },
+      "individual": {
+        "n": 10,
+        "accuracy": 0.9
+      },
+      "other": {
+        "n": 1,
+        "accuracy": 1.0
+      },
+      "partnership": {
+        "n": 3,
+        "accuracy": 1.0
+      },
+      "sole_trader": {
+        "n": 6,
+        "accuracy": 1.0
+      },
+      "trust": {
+        "n": 7,
+        "accuracy": 0.8571
+      },
+      "unincorporated_association": {
+        "n": 4,
+        "accuracy": 0.75
+      }
+    }
+  },
+  "abstention": {
+    "unanswerable_n": 9,
+    "unanswerable_abstain_rate": 0.7778,
+    "answerable_n": 53,
+    "false_abstain_rate": 0.0
+  },
+  "retrieval": {
+    "n": 53,
+    "recall_at_8": 0.7264,
+    "hit_at_8": 0.7925,
+    "mrr": 0.586,
+    "items_without_reachable_refs": []
+  },
+  "attribution": {
+    "citation_validity": 0.9934,
+    "citation_precision_section": 0.4261,
+    "citation_precision_document": 0.4816,
+    "citation_recall_section": 0.7075,
+    "answers_with_uncited_points": 4
+  },
+  "faithfulness": {
+    "points": 373,
+    "judge_supported_rate": 0.6729,
+    "lexical_supported_rate": 0.9008,
+    "source_claims_judge_rate": 0.6729,
+    "by_kind": {
+      "key_points": {
+        "n": 44,
+        "judge_supported_rate": 0.7727,
+        "lexical_supported_rate": 1.0
+      },
+      "reasoning": {
+        "n": 169,
+        "judge_supported_rate": 0.5207,
+        "lexical_supported_rate": 0.787
+      },
+      "required_measures": {
+        "n": 160,
+        "judge_supported_rate": 0.8063,
+        "lexical_supported_rate": 0.9938
+      }
+    },
+    "judge": "ollama:llama3.1:8b"
+  },
+  "explain": {
+    "n": 8,
+    "key_fact_recall": 0.9062
+  },
+  "consistency": {
+    "groups": 6,
+    "agreement_rate": 1.0,
+    "all_correct_rate": 0.8333,
+    "detail": {
+      "G-domestic-pep-medium": {
+        "D11-domestic-pep-medium-risk": "enhanced",
+        "D51-assoc-domestic-pep-treasurer": "enhanced"
+      },
+      "G-foreign-pep": {
+        "D01-foreign-pep-individual": "enhanced",
+        "D02-foreign-pep-beneficial-owner": "enhanced",
+        "D03-foreign-pep-trust-appointor": "enhanced",
+        "D14-foreign-pep-family-member": "enhanced",
+        "D41-unit-trust-foreign-pep": "enhanced",
+        "D54-partnership-foreign-pep": "enhanced"
+      },
+      "G-high-risk-jurisdiction": {
+        "D04-high-risk-jurisdiction-company": "enhanced",
+        "D35-government-body-high-risk-jurisdiction": "enhanced",
+        "D42-trust-formed-high-risk": "enhanced",
+        "D44-sole-trader-high-risk-country": "enhanced"
+      },
+      "G-simplified-government": {
+        "D28-commonwealth-department": "simplified",
+        "D47-local-council": "simplified",
+        "D48-state-owned-corporation": "simplified"
+      },
+      "G-smr": {
+        "D06-smr-continuing-sole-trader": "enhanced",
+        "D36-low-risk-individual-smr": "enhanced"
+      },
+      "G-standard-individual": {
+        "D16-standard-individual": "standard",
+        "D17-standard-individual-paraphrase": "standard"
+      }
+    }
+  },
+  "calibration": {
+    "high": {
+      "n": 19,
+      "accuracy": 0.8947
+    },
+    "low": {
+      "n": 4,
+      "accuracy": 1.0
+    },
+    "medium": {
+      "n": 22,
+      "accuracy": 0.8636
+    }
+  },
+  "latency_s": {
+    "mean": 83.94,
+    "p50": 83.32,
+    "p95": 120.23
+  },
+  "errors": [],
+  "needs_review_rate": 0.1774,
+  "walert": {
+    "out_of_kb_n": 7,
+    "pct_unanswered_out_of_kb": 0.8571,
+    "underspecified_n": 2,
+    "pct_unanswered_underspecified": 0.5,
+    "ndcg": {
+      "known": {
+        "@1": 0.7344,
+        "@3": 0.6223,
+        "@5": 0.6232,
+        "n": 32
+      },
+      "inferred": {
+        "@1": 0.4286,
+        "@3": 0.4159,
+        "@5": 0.4195,
+        "n": 21
+      },
+      "all": {
+        "@1": 0.6132,
+        "@3": 0.5405,
+        "@5": 0.5425,
+        "n": 53
+      }
+    },
+    "rouge1": {
+      "n": 53,
+      "precision": 0.1722,
+      "recall": 0.6805,
+      "f1": 0.2694,
+      "stemmer": false
+    },
+    "bertscore": null
+  },
+  "fairness": {
+    "groups": 4,
+    "variants": 12,
+    "invariance_rate": 1.0,
+    "tier_flip_rate": 0.0,
+    "confidence_flip_rate": 0.5,
+    "variant_accuracy": 1.0,
+    "flips": [],
+    "detail": {
+      "D01-foreign-pep-individual": {
+        "D01-foreign-pep-individual": "enhanced",
+        "D01-cf-new-zealand": "enhanced",
+        "D01-cf-united-kingdom": "enhanced",
+        "D01-cf-india": "enhanced"
+      },
+      "D16-standard-individual": {
+        "D16-standard-individual": "standard",
+        "D16-cf-aisha-rahman": "standard",
+        "D16-cf-nguyen-thi-lan": "standard",
+        "D16-cf-priya-sharma": "standard"
+      },
+      "D17-standard-individual-paraphrase": {
+        "D17-standard-individual-paraphrase": "standard",
+        "D17-cf-born-india": "standard",
+        "D17-cf-born-china": "standard",
+        "D17-cf-born-greece": "standard"
+      },
+      "D18-sole-trader": {
+        "D18-sole-trader": "standard",
+        "D18-cf-mohammed-hassan": "standard",
+        "D18-cf-tran-van-minh": "standard",
+        "D18-cf-kwame-mensah": "standard"
+      }
+    }
+  },
+  "headline": {
+    "tier_accuracy_acceptable": 0.8889,
+    "tier_accuracy_strict": 0.8889,
+    "mandatory_ecdd_recall": 0.9524,
+    "under_application_rate": 0.0667,
+    "over_application_rate": 0.0444,
+    "retrieval_recall_at_k": 0.7264,
+    "citation_validity": 0.9934,
+    "citation_precision": 0.4261,
+    "citation_recall": 0.7075,
+    "faithfulness": 0.6729,
+    "key_fact_recall": 0.9062,
+    "unanswerable_abstain_rate": 0.7778,
+    "false_abstain_rate": 0.0,
+    "consistency_agreement": 1.0,
+    "fairness_invariance": 1.0,
+    "fairness_tier_flip_rate": 0.0,
+    "walert_pct_unanswered_out_of_kb": 0.8571,
+    "walert_ndcg_at_5": 0.5425,
+    "walert_rouge1_f1": 0.2694,
+    "walert_bertscore_f1": null,
+    "latency_p50_s": 83.32,
+    "latency_p95_s": 120.23
+  },
+  "acceptance": [
+    {
+      "name": "tier_accuracy_acceptable",
+      "metric": "tier_accuracy_acceptable",
+      "value": 0.8889,
+      "limit": 0.8,
+      "direction": "min",
+      "passed": true
+    },
+    {
+      "name": "mandatory_ecdd_recall",
+      "metric": "mandatory_ecdd_recall",
+      "value": 0.9524,
+      "limit": 1.0,
+      "direction": "min",
+      "passed": false
+    },
+    {
+      "name": "under_application_rate_max",
+      "metric": "under_application_rate",
+      "value": 0.0667,
+      "limit": 0.05,
+      "direction": "max",
+      "passed": false
+    },
+    {
+      "name": "retrieval_recall_at_k",
+      "metric": "retrieval_recall_at_k",
+      "value": 0.7264,
+      "limit": 0.8,
+      "direction": "min",
+      "passed": false
+    },
+    {
+      "name": "citation_validity",
+      "metric": "citation_validity",
+      "value": 0.9934,
+      "limit": 1.0,
+      "direction": "min",
+      "passed": false
+    },
+    {
+      "name": "citation_precision",
+      "metric": "citation_precision",
+      "value": 0.4261,
+      "limit": 0.6,
+      "direction": "min",
+      "passed": false
+    },
+    {
+      "name": "faithfulness",
+      "metric": "faithfulness",
+      "value": 0.6729,
+      "limit": 0.8,
+      "direction": "min",
+      "passed": false
+    },
+    {
+      "name": "unanswerable_abstain_rate",
+      "metric": "unanswerable_abstain_rate",
+      "value": 0.7778,
+      "limit": 0.75,
+      "direction": "min",
+      "passed": true
+    },
+    {
+      "name": "false_abstain_rate_max",
+      "metric": "false_abstain_rate",
+      "value": 0.0,
+      "limit": 0.15,
+      "direction": "max",
+      "passed": true
+    },
+    {
+      "name": "fairness_tier_flip_rate_max",
+      "metric": "fairness_tier_flip_rate",
+      "value": 0.0,
+      "limit": 0.0,
+      "direction": "max",
+      "passed": true
+    }
+  ],
+  "run": {
+    "preset": "full",
+    "started": "20261001-031851",
+    "duration_s": 9884.2,
+    "gold_file": "/Users/shreyasshekhar/Desktop/aml-cdd-assistant/data/gold/scenarios.jsonl",
+    "n_items": 74,
+    "generator": "ollama:qwen3.5:9b",
+    "embedder": "ollama:qwen3-embedding:8b",
+    "judge": "ollama:llama3.1:8b",
+    "judge_same_as_generator": false,
+    "snapshot": "2026-09-30",
+    "bertscore": {
+      "model": "roberta-large",
+      "rescale_with_baseline": false,
+      "status": "skipped (bert-score not installed)"
+    },
+    "index_digest": "6a09f4b4a9e9a849",
+    "gold_status": {
+      "draft": 74,
+      "reviewed": 0
+    },
+    "finished": "2026-09-30T20:03:35+00:00",
+    "gold_digest": "463bda694415",
+    "rescored_from": "20261001-031851-full-qwen3.5-9b_qwen3-embedding-8b",
+    "rescored_at": "20261001-132546"
+  }
+}

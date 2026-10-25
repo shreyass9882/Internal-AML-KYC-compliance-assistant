@@ -1,0 +1,238 @@
+{
+  "n_items": 15,
+  "n_counterfactual_variants": 0,
+  "k": 8,
+  "tier": {
+    "n": 0,
+    "accuracy_strict": null,
+    "accuracy_acceptable": null,
+    "under_application_rate": null,
+    "over_application_rate": null,
+    "abstained_rate": null,
+    "mandatory_ecdd_recall": null,
+    "macro_f1": null,
+    "confusion": {},
+    "accuracy_by_customer_type": {}
+  },
+  "abstention": {
+    "unanswerable_n": 7,
+    "unanswerable_abstain_rate": 1.0,
+    "answerable_n": 8,
+    "false_abstain_rate": 0.0
+  },
+  "retrieval": {
+    "n": 8,
+    "recall_at_8": 0.9375,
+    "hit_at_8": 1.0,
+    "mrr": 0.75,
+    "items_without_reachable_refs": []
+  },
+  "attribution": {
+    "citation_validity": 1.0,
+    "citation_precision_section": 0.5573,
+    "citation_precision_document": 0.5729,
+    "citation_recall_section": 0.9375,
+    "answers_with_uncited_points": 0
+  },
+  "faithfulness": {
+    "points": 38,
+    "judge_supported_rate": 0.9474,
+    "lexical_supported_rate": 1.0,
+    "source_claims_judge_rate": 0.9474,
+    "by_kind": {
+      "key_points": {
+        "n": 38,
+        "judge_supported_rate": 0.9474,
+        "lexical_supported_rate": 1.0
+      }
+    },
+    "judge": "ollama:llama3.1:8b"
+  },
+  "explain": {
+    "n": 8,
+    "key_fact_recall": 0.875
+  },
+  "consistency": {
+    "groups": 0,
+    "agreement_rate": null,
+    "all_correct_rate": null,
+    "detail": {}
+  },
+  "calibration": {},
+  "latency_s": {
+    "mean": 44.65,
+    "p50": 43.0,
+    "p95": 60.31
+  },
+  "errors": [],
+  "needs_review_rate": 0.4667,
+  "walert": {
+    "out_of_kb_n": 7,
+    "pct_unanswered_out_of_kb": 1.0,
+    "underspecified_n": 0,
+    "pct_unanswered_underspecified": null,
+    "ndcg": {
+      "known": {
+        "@1": 0.75,
+        "@3": 0.6678,
+        "@5": 0.6793,
+        "n": 8
+      },
+      "all": {
+        "@1": 0.75,
+        "@3": 0.6678,
+        "@5": 0.6793,
+        "n": 8
+      }
+    },
+    "rouge1": {
+      "n": 8,
+      "precision": 0.2031,
+      "recall": 0.6784,
+      "f1": 0.3109,
+      "stemmer": false
+    },
+    "bertscore": null
+  },
+  "fairness": {
+    "groups": 0,
+    "variants": 0,
+    "invariance_rate": null,
+    "tier_flip_rate": null,
+    "confidence_flip_rate": null,
+    "variant_accuracy": null,
+    "flips": [],
+    "detail": {}
+  },
+  "headline": {
+    "tier_accuracy_acceptable": null,
+    "tier_accuracy_strict": null,
+    "mandatory_ecdd_recall": null,
+    "under_application_rate": null,
+    "over_application_rate": null,
+    "retrieval_recall_at_k": 0.9375,
+    "citation_validity": 1.0,
+    "citation_precision": 0.5573,
+    "citation_recall": 0.9375,
+    "faithfulness": 0.9474,
+    "key_fact_recall": 0.875,
+    "unanswerable_abstain_rate": 1.0,
+    "false_abstain_rate": 0.0,
+    "consistency_agreement": null,
+    "fairness_invariance": null,
+    "fairness_tier_flip_rate": null,
+    "walert_pct_unanswered_out_of_kb": 1.0,
+    "walert_ndcg_at_5": 0.6793,
+    "walert_rouge1_f1": 0.3109,
+    "walert_bertscore_f1": null,
+    "latency_p50_s": 43.0,
+    "latency_p95_s": 60.31
+  },
+  "acceptance": [
+    {
+      "name": "tier_accuracy_acceptable",
+      "metric": "tier_accuracy_acceptable",
+      "value": null,
+      "limit": 0.8,
+      "direction": "min",
+      "passed": null
+    },
+    {
+      "name": "mandatory_ecdd_recall",
+      "metric": "mandatory_ecdd_recall",
+      "value": null,
+      "limit": 1.0,
+      "direction": "min",
+      "passed": null
+    },
+    {
+      "name": "under_application_rate_max",
+      "metric": "under_application_rate",
+      "value": null,
+      "limit": 0.05,
+      "direction": "max",
+      "passed": null
+    },
+    {
+      "name": "retrieval_recall_at_k",
+      "metric": "retrieval_recall_at_k",
+      "value": 0.9375,
+      "limit": 0.8,
+      "direction": "min",
+      "passed": true
+    },
+    {
+      "name": "citation_validity",
+      "metric": "citation_validity",
+      "value": 1.0,
+      "limit": 1.0,
+      "direction": "min",
+      "passed": true
+    },
+    {
+      "name": "citation_precision",
+      "metric": "citation_precision",
+      "value": 0.5573,
+      "limit": 0.6,
+      "direction": "min",
+      "passed": false
+    },
+    {
+      "name": "faithfulness",
+      "metric": "faithfulness",
+      "value": 0.9474,
+      "limit": 0.8,
+      "direction": "min",
+      "passed": true
+    },
+    {
+      "name": "unanswerable_abstain_rate",
+      "metric": "unanswerable_abstain_rate",
+      "value": 1.0,
+      "limit": 0.75,
+      "direction": "min",
+      "passed": true
+    },
+    {
+      "name": "false_abstain_rate_max",
+      "metric": "false_abstain_rate",
+      "value": 0.0,
+      "limit": 0.15,
+      "direction": "max",
+      "passed": true
+    },
+    {
+      "name": "fairness_tier_flip_rate_max",
+      "metric": "fairness_tier_flip_rate",
+      "value": null,
+      "limit": 0.0,
+      "direction": "max",
+      "passed": null
+    }
+  ],
+  "run": {
+    "preset": "full",
+    "started": "20261001-191304",
+    "duration_s": 710.5,
+    "gold_file": "/Users/shreyasshekhar/Projects/aml-cdd-assistant/data/gold/scenarios.jsonl",
+    "n_items": 15,
+    "generator": "ollama:qwen3.5:9b",
+    "embedder": "ollama:qwen3-embedding:8b",
+    "judge": "ollama:llama3.1:8b",
+    "judge_same_as_generator": false,
+    "snapshot": "2026-09-30",
+    "bertscore": {
+      "model": "roberta-large",
+      "rescale_with_baseline": false,
+      "status": "skipped (bert-score not installed)"
+    },
+    "prompt_version": "3.1",
+    "gold_digest": "463bda694415",
+    "index_digest": "6a09f4b4a9e9a849",
+    "gold_status": {
+      "draft": 15,
+      "reviewed": 0
+    },
+    "finished": "2026-10-01T09:25:23+00:00"
+  }
+}

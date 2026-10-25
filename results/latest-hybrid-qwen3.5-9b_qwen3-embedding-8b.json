@@ -1,0 +1,27 @@
+{
+  "dir": "/Users/shreyasshekhar/Projects/aml-cdd-assistant/results/20261025-071908-hybrid-qwen3.5-9b_qwen3-embedding-8b",
+  "headline": {
+    "tier_accuracy_acceptable": 0.8222,
+    "tier_accuracy_strict": 0.8222,
+    "mandatory_ecdd_recall": 0.9048,
+    "under_application_rate": 0.1333,
+    "over_application_rate": 0.0444,
+    "retrieval_recall_at_k": 0.6226,
+    "citation_validity": 1.0,
+    "citation_precision": 0.3888,
+    "citation_recall": 0.5849,
+    "faithfulness": 0.8399,
+    "key_fact_recall": 0.875,
+    "unanswerable_abstain_rate": 1.0,
+    "false_abstain_rate": 0.0,
+    "consistency_agreement": 0.8333,
+    "fairness_invariance": 0.75,
+    "fairness_tier_flip_rate": 0.0833,
+    "walert_pct_unanswered_out_of_kb": 1.0,
+    "walert_ndcg_at_5": 0.4139,
+    "walert_rouge1_f1": 0.2296,
+    "walert_bertscore_f1": null,
+    "latency_p50_s": 79.65,
+    "latency_p95_s": 100.98
+  }
+}
