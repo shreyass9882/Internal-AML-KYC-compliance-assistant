@@ -27,3 +27,4 @@ logs/*.log
 Undo update *.command
 CDD update*/
 files/
+.Rhistory
